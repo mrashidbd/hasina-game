@@ -1,0 +1,126 @@
+:root {
+  --green: #0f6a45;
+  --red: #f42a41;
+  --mint: #7cffb2;
+  --ink: #f3f6f4;
+  --panel: rgba(12, 22, 18, 0.88);
+  --line: rgba(255, 255, 255, 0.12);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: #2b2633; color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none; -webkit-user-select: none; overscroll-behavior: none;
+}
+canvas#game { position: fixed; inset: 0; display: block; touch-action: none; }
+.hidden { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(8px + var(--safe-t)) 12px 8px;
+  background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0));
+  pointer-events: none;
+}
+#hud .stat { display: flex; flex-direction: column; line-height: 1.05; min-width: 56px; }
+#hud .stat small { font-size: 10px; letter-spacing: .12em; opacity: .7; }
+#hud .stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
+#hud .mid { flex: 1; display: flex; flex-direction: column; align-items: center; font-weight: 700; font-size: 14px; }
+#combo { color: #ffe15a; text-shadow: 0 1px 3px #000; min-height: 18px; }
+#shield { font-size: 14px; min-height: 18px; }
+#hud .icon {
+  pointer-events: auto; width: 42px; height: 42px; border-radius: 12px;
+  border: 1px solid var(--line); background: rgba(0,0,0,.35); font-size: 18px;
+}
+
+#sweepBtn {
+  position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + var(--safe-b)); width: min(260px, 70vw); height: 54px;
+  border-radius: 27px; border: 2px solid rgba(255,225,90,.4); background: rgba(0,0,0,.55);
+  overflow: hidden; font-weight: 800; letter-spacing: .1em; opacity: .7;
+}
+#sweepFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #a87b00, #ffe15a); transition: width .2s; }
+#sweepBtn .lbl { position: relative; text-shadow: 0 1px 2px #000; }
+#sweepBtn.ready { opacity: 1; border-color: #ffe15a; animation: pulse .8s infinite alternate; }
+@keyframes pulse { to { box-shadow: 0 0 24px #ffe15a; transform: translateX(-50%) scale(1.05); } }
+
+/* ---------- Banner ---------- */
+#banner {
+  position: fixed; z-index: 6; left: 0; right: 0; top: 22%; text-align: center;
+  pointer-events: none; opacity: 0; transform: scale(.8);
+}
+#banner.show { animation: banner 1.8s ease forwards; }
+@keyframes banner {
+  0% { opacity: 0; transform: scale(.7); }
+  15% { opacity: 1; transform: scale(1.05); }
+  25% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+#bannerTitle { font-size: clamp(28px, 8vw, 54px); font-weight: 900; text-shadow: 0 3px 12px rgba(0,0,0,.7); }
+#bannerSub { font-size: 16px; font-weight: 600; color: #ffe15a; text-shadow: 0 2px 6px #000; margin-top: 4px; }
+
+/* ---------- Screens ---------- */
+.screen {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+  padding: calc(16px + var(--safe-t)) 16px calc(16px + var(--safe-b));
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.75));
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.panel {
+  width: min(440px, 100%); max-height: 100%; padding: 26px 22px; border-radius: 22px;
+  background: var(--panel); border: 1px solid var(--line); text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 10px;
+}
+.panel.scroll { overflow-y: auto; text-align: left; }
+.logo { font-size: 52px; line-height: 1; }
+h1 { margin: 4px 0 0; font-size: clamp(32px, 9vw, 44px); font-weight: 900; letter-spacing: -.02em;
+  background: linear-gradient(180deg, #fff, var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h2 { margin: 0 0 4px; font-size: 28px; text-align: center; }
+h2.bad { color: #ff5a6a; }
+h3 { margin: 10px 0 2px; font-size: 16px; color: var(--mint); }
+h3 small { color: var(--ink); opacity: .6; font-weight: 400; }
+.tag { margin: 0 0 6px; opacity: .85; line-height: 1.4; }
+.hint { margin: 2px 0 0; font-size: 12px; opacity: .6; text-align: center; }
+.best { margin: 6px 0 0; font-weight: 700; color: #ffe15a; }
+kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+
+.panel button {
+  padding: 13px 16px; border-radius: 14px; border: 1px solid var(--line);
+  background: rgba(255,255,255,.06); font-weight: 700; font-size: 16px;
+}
+.panel button:hover { background: rgba(255,255,255,.12); }
+.panel button.primary {
+  background: linear-gradient(180deg, #19a56a, var(--green)); border-color: #23c47f;
+  font-size: 20px; padding: 15px; box-shadow: 0 6px 20px rgba(25,165,106,.35);
+}
+.rules { margin: 0; padding-left: 18px; line-height: 1.45; font-size: 14px; }
+.rules li { margin: 4px 0; }
+
+.table { display: flex; flex-direction: column; gap: 6px; }
+.table .row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.table .face { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; background: rgba(255,255,255,.08); flex: none; }
+.table .nm { flex: 1; display: flex; flex-direction: column; font-weight: 700; }
+.table .nm small { font-weight: 400; opacity: .65; font-size: 12px; }
+.table b { color: #ffe15a; font-variant-numeric: tabular-nums; }
+.table b::after { content: ' pts'; font-size: 11px; opacity: .7; }
+
+.bigscore { font-size: 56px; font-weight: 900; color: #ffe15a; font-variant-numeric: tabular-nums; line-height: 1; }
+.record { font-weight: 800; color: var(--mint); animation: pulse2 .7s infinite alternate; }
+@keyframes pulse2 { to { transform: scale(1.08); } }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; }
+.stats div { display: flex; justify-content: space-between; gap: 6px; padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.05); font-size: 13px; }
+.stats span { opacity: .7; text-align: left; }
+.stats div:last-child { grid-column: span 2; }
+
+@media (max-height: 640px) {
+  .panel { padding: 16px; gap: 7px; }
+  .logo { font-size: 36px; }
+  .panel button { padding: 10px; }
+  .bigscore { font-size: 42px; }
+}
