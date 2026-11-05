@@ -40,6 +40,7 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 | `js/i18n.js` | English and Bangla text (language toggle on the menu; Bangla is picked automatically on Bangla devices) |
 | `js/main.js` | UI wiring, high score (localStorage), share, install prompt, SW registration |
 | `sw.js` / `manifest.webmanifest` / `icons/` | PWA: offline cache, install metadata, icons |
+| `CLAUDE.md` / `AGENTS.md` / `docs/` | Developer & AI-agent docs: conventions, architecture, changelog, TODO |
 
 ---
 
