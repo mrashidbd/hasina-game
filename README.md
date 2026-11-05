@@ -34,9 +34,10 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 | `index.html` | Screens (menu, how-to, pause, game over) and the HUD |
 | `css/style.css` | UI styling, responsive, safe-area aware (notches) |
 | `js/map.js` | Simplified outline of Bangladesh (lon/lat) tagged by border type (India / Myanmar / coast), projection, geometry helpers |
-| `js/characters.js` | **Roster and balance**: names, emoji, sprites, HP, speed, points; power-ups |
+| `js/characters.js` | **Roster and balance**: tiers, penalties, emoji, sprites, HP, speed, points, behaviours; power-ups |
 | `js/game.js` | Game engine: waves, spawning, movement, input, scoring, rendering |
 | `js/audio.js` | Synthesized sound effects (WebAudio, no files) |
+| `js/i18n.js` | English and Bangla text (language toggle on the menu; Bangla is picked automatically on Bangla devices) |
 | `js/main.js` | UI wiring, high score (localStorage), share, install prompt, SW registration |
 | `sw.js` / `manifest.webmanifest` / `icons/` | PWA: offline cache, install metadata, icons |
 
@@ -50,52 +51,71 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 2. Each one walks to a point on the border and then heads for Dhaka.
 3. The player **taps or clicks** intruders to catch them. Tough ones take several taps, and each
    hit knocks them back a little.
-4. If an intruder's body crosses the border: a **🛡️ shield** absorbs it if you have one.
-   Otherwise it's **game over**.
+4. What happens when someone gets in depends on their **tier** (below). Only Hasina ends the game.
 5. When a wave is cleared there's a bonus and a short break, then the next, harder wave starts.
 
-## Intruders (placeholders)
+## Character tiers (all names and art are placeholders)
 
-| Type | Taps | Speed | Points | Appears | Notes |
-|---|---|---|---|---|---|
-| 😠 Cadre | 1 | normal | 10 | wave 1 | The basic one |
-| 🏃 Runner | 1 | fast | 20 | wave 2 | Zig-zags |
-| 😤 Leader | 3 | slow | 50 | wave 3 | Has an HP bar and gets knocked back when hit |
-| 🥷 Sneaky | 1 | normal | 30 | wave 4 | Fades in and out of view |
-| 👑 Boss | 12 (+4 every 5 waves) | very slow | 250 | every 5th wave | Calls in cadres, always drops a power-up |
+Everything is configured in `js/characters.js`. Names, in English and Bangla, are in `js/i18n.js` under `char`.
+
+| Tier | Who | If they get in |
+|---|---|---|
+| **1. Main target** | Hasina only | **Game over.** A 🛡️ shield, if you have one, throws her back to where she started instead |
+| **2. Senior leaders** | 4 placeholder characters | **−200 points** (score never drops below 0) |
+| **3. Small leaders** | 4 placeholder characters | **−50 points** |
+
+| ID | Placeholder | Tier | Taps | Points | From wave | Behaviour |
+|---|---|---|---|---|---|---|
+| `hasina` | 👑 Hasina | 1 | 15 (+5 each time she returns) | 500 | every 3rd wave, every 2nd from wave 12 | Slow, gold aura, calls in small and senior leaders, always drops a power-up |
+| `senior1` | 😤 Senior Leader 1 | 2 | 3 | 50 | 2 | Heavy |
+| `senior2` | 🕴️ Senior Leader 2 | 2 | 2 | 60 | 4 | Jumps sideways when hit |
+| `senior3` | 📢 Senior Leader 3 | 2 | 4 | 80 | 5 | Keeps calling in small leaders |
+| `senior4` | 😎 Senior Leader 4 | 2 | 7 | 120 | 7 | Very tough, very slow |
+| `small1` | 😠 Small Leader 1 | 3 | 1 | 10 | 1 | Basic |
+| `small2` | 🏃 Small Leader 2 | 3 | 1 | 20 | 2 | Fast, zig-zags |
+| `small3` | 🥷 Small Leader 3 | 3 | 1 | 25 | 3 | Fades in and out of view |
+| `small4` | 😬 Small Leader 4 | 3 | 1 | 8 | 4 | Comes in packs of 3 |
+
+To add more characters to a tier, copy an entry in `CHARACTERS`, give it a new ID, and add
+its name and trait to both languages in `i18n.js`. It joins the wave mix automatically from its `unlock` wave.
 
 ## Point system
 
 | Source | Points |
 |---|---|
 | Catch | Base points × **combo multiplier** |
-| Combo | Catches less than 1.5 s apart build a combo. Multiplier = 1 + ⌊(combo−1)/5⌋, up to **×5**. A missed tap resets it |
+| Combo | Catches less than 1.5 s apart build a combo. Multiplier = 1 + ⌊(combo−1)/5⌋, up to **×5**. A missed tap or a leak resets it |
 | Close call | **+25** for catching an intruder within ~12 km of the border |
 | Wave clear | **+50 × wave number** |
 | Sharpshooter | **+25 × wave number** if accuracy in that wave is ≥ 90% |
+| Sealed border | **+30 × wave number** if nobody got in during that wave |
 | Sweep catches | **50%** of base points, with no multiplier |
+| Senior leader gets in | **−200** |
+| Small leader gets in | **−50** |
 
-High score and best wave are saved on the device.
+High score and best wave are saved on the device. The game-over screen shows how many got in
+and how many points that cost.
 
 ## Difficulty curve
 - Intruders per wave: `5 + 1.8 × wave`
 - Spawn interval: `1.5 s × 0.92^(wave−1)`, minimum 0.3 s. From wave 6 there's a 20% chance of a double spawn.
 - Speed multiplier: `1 + 0.07 × (wave−1)`, capped at ×2.1
-- Tougher types become more common as waves go up. One extra boss is added every 15 waves.
+- Wave mix: Small Leader 1 is the backbone (weight 10). Other small leaders have weight `2 + 0.6 × wave`, senior leaders `1 + 0.35 × wave`.
+- Hasina appears every 3rd wave (every 2nd from wave 12) with 5 more HP each time.
 
 ## Power-ups
-Any catch has a 7% chance to drop one, and bosses always drop one. Tap a power-up to collect it.
+Any catch has a 7% chance to drop one, and Hasina always drops one. Tap a power-up to collect it.
 It disappears after 6 s.
 
 | | Effect |
 |---|---|
 | ❄️ Freeze | All intruders stop for 4 s |
 | 🧱 Border Wall | Intruders move at 40% speed for 7 s |
-| 🛡️ Shield | Absorbs one breach (stack up to 3) |
+| 🛡️ Shield | Throws Hasina back once (stack up to 3) |
 | ⚡ Charge | +40 to the Sweep meter |
 
 **⚡ Sweep** (button, or <kbd>Space</kbd>): fills as you catch intruders. When it's full, it catches
-everyone on screen at once. Bosses take 4 damage instead.
+everyone on screen at once. Hasina only takes 4 damage.
 
 ## Controls
 - Mobile: tap
@@ -109,9 +129,9 @@ Change `name` to rename a character in the how-to table and on the game-over scr
 Add new files to `ASSETS` in `sw.js` so they work offline.
 
 ## Roadmap / ideas
-- [ ] Real character art and a proper flag/border art pass
+- [ ] Real names and art for the tier 2 and tier 3 characters
+- [ ] A proper art pass on the flag and border
 - [ ] Background music and Bangla voice lines ("Dhoro!", "Palao!")
-- [ ] Bangla language toggle (UI text is all in `index.html` / `main.js`)
 - [ ] More accurate border outline (GeoJSON simplified with mapshaper)
 - [ ] Online leaderboard (e.g. Supabase or Firebase) and a daily challenge seed
 - [ ] More intruder types: one that splits in two when caught, a decoy that costs points if you tap it, one that tunnels underground

@@ -39,6 +39,7 @@ export const sfx = {
   wave: () => [523, 659, 784].forEach((f, i) => tone(f, 0.18, { type: 'triangle', delay: i * 0.1 })),
   boss: () => tone(110, 0.6, { type: 'sawtooth', vol: 0.1, slide: -40 }),
   sweep: () => tone(200, 0.5, { type: 'sawtooth', vol: 0.12, slide: 1200 }),
+  leak: () => tone(220, 0.25, { type: 'sawtooth', vol: 0.08, slide: -140 }),
   shield: () => tone(300, 0.3, { type: 'square', vol: 0.1, slide: -200 }),
   over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', vol: 0.09, delay: i * 0.18 })),
 };

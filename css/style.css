@@ -104,6 +104,11 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
 .rules li { margin: 4px 0; }
 
 .table { display: flex; flex-direction: column; gap: 6px; }
+.tier { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.tierHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 800; font-size: 13px; letter-spacing: .04em; }
+.tierHead em { font-style: normal; font-weight: 700; font-size: 12px; color: #ff8a8a; }
+.tier.t1 .tierHead em { color: #ff4d5e; }
+.tier.t1 .row { background: rgba(255,215,0,.08); border: 1px solid rgba(255,215,0,.25); }
 .table .row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
 .table .face { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; background: rgba(255,255,255,.08); flex: none; }
 .table .nm { flex: 1; display: flex; flex-direction: column; font-weight: 700; }

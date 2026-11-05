@@ -1,5 +1,5 @@
 import { Game } from './game.js';
-import { CHARACTERS, POWERUPS } from './characters.js';
+import { CHARACTERS, POWERUPS, TIERS } from './characters.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
 
@@ -64,7 +64,8 @@ function renderOver() {
   $('overReason').textContent = t('breachReason', { who: s.intruderType ? t(`char.${s.intruderType}`).toLowerCase() : '', wave: s.wave });
   $('overStats').innerHTML = [
     ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
-    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sBoss', fmt(s.bosses)],
+    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)],
+    ['sLeaked', fmt(s.leaked)], ['sLost', fmt(s.lost)],
     ['sBest', fmt(lastBest)],
   ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
 }
@@ -131,10 +132,14 @@ function applyLang() {
   document.title = t('title');
   for (const el of document.querySelectorAll('[data-i18n]')) el.innerHTML = t(el.dataset.i18n);
   $('rules').innerHTML = t('rules').map((li) => `<li>${li}</li>`).join('');
-  $('roster').innerHTML = Object.entries(CHARACTERS).map(([k, c]) => `
-    <div class="row"><span class="face" style="background:${c.color}">${c.emoji}</span>
-    <span class="nm">${t(`char.${k}`)}<small>${c.hp > 1 ? t('taps', { n: `${fmt(c.hp)}+` }) : t('tap1')} · ${t('fromWave', { n: c.unlock })}</small></span>
-    <b>${fmt(c.points)} <small>${t('pts')}</small></b></div>`).join('');
+  $('roster').innerHTML = [1, 2, 3].map((tier) => {
+    const note = TIERS[tier].gameOver ? t('tier1Note') : t('tierPenalty', { n: TIERS[tier].penalty });
+    const rows = Object.entries(CHARACTERS).filter(([, c]) => c.tier === tier).map(([k, c]) => `
+      <div class="row"><span class="face" style="background:${c.color}">${c.emoji}</span>
+      <span class="nm">${t(`char.${k}`)}<small>${t(`trait.${k}`)} · ${c.hp > 1 ? t('taps', { n: `${fmt(c.hp)}+` }) : t('tap1')}${c.unlock ? ` · ${t('fromWave', { n: c.unlock })}` : ''}</small></span>
+      <b>${fmt(c.points)} <small>${t('pts')}</small></b></div>`).join('');
+    return `<div class="tier t${tier}"><div class="tierHead"><span>${t(`tier${tier}`)}</span><em>${note}</em></div>${rows}</div>`;
+  }).join('');
   $('powers').innerHTML = Object.entries(POWERUPS).map(([k, p]) => `
     <div class="row"><span class="face">${p.emoji}</span>
     <span class="nm">${t(`puName.${k}`)}<small>${t(`puDesc.${k}`)}</small></span></div>`).join('');

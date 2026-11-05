@@ -1,7 +1,9 @@
 import {
   BD, SEA, MYANMAR, INDIA_EDGES, INDIA_LEN, DHAKA, LABELS, BBOX, pointInPoly, distToPoly,
 } from './map.js';
-import { CHARACTERS, POWERUPS } from './characters.js';
+import {
+  CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
+} from './characters.js';
 import { sfx } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 
@@ -62,8 +64,10 @@ export class Game {
     this.shake = 0;
     this.flash = 0;
     this.breachAt = null;
-    this.stats = { caught: 0, taps: 0, hits: 0, closeCalls: 0, bosses: 0 };
-    this.waveStats = { taps: 0, hits: 0 };
+    this.stats = { caught: 0, taps: 0, hits: 0, closeCalls: 0, mains: 0, leaked: 0, lost: 0 };
+    this.waveStats = { taps: 0, hits: 0, leaks: 0 };
+    this.mainCount = 0;
+    this.leakFlash = 0;
   }
 
   // ---------------------------------------------------------------- layout
@@ -129,22 +133,22 @@ export class Game {
   nextWave() {
     this.wave += 1;
     const n = this.wave;
-    this.waveStats = { taps: 0, hits: 0 };
+    this.waveStats = { taps: 0, hits: 0, leaks: 0 };
     const count = 5 + Math.floor(n * 1.8);
+    // Weighting: the basic small leader is the backbone; other small leaders grow
+    // with the wave number, senior leaders grow more slowly.
     const pool = Object.entries(CHARACTERS)
-      .filter(([k, c]) => k !== 'boss' && n >= c.unlock)
-      .map(([k]) => [k, k === 'cadre' ? 10 : 2 + n * 0.6]);
+      .filter(([, c]) => c.tier > 1 && n >= c.unlock)
+      .map(([k, c]) => [k, k === 'small1' ? 10 : c.tier === 3 ? 2 + n * 0.6 : 1 + n * 0.35]);
     const q = [];
     for (let i = 0; i < count; i++) q.push(weighted(pool));
-    if (n % 5 === 0) {
-      const bosses = 1 + Math.floor(n / 15);
-      for (let b = 0; b < bosses; b++) q.splice(Math.floor((q.length * (b + 1)) / (bosses + 1)), 0, 'boss');
-    }
+    const main = isMainWave(n);
+    if (main) q.splice(Math.floor(q.length / 2), 0, MAIN_ID);
     this.queue = q;
     this.spawnInterval = Math.max(0.3, 1.5 * Math.pow(0.92, n - 1));
     this.speedMul = Math.min(2.1, 1 + 0.07 * (n - 1));
     this.spawnT = 1.2;
-    this.hooks.onBanner?.(tr('wave', { n }), n % 5 === 0 ? tr('bossIncoming') : tr('nIntruders', { n: q.length }));
+    this.hooks.onBanner?.(tr('wave', { n }), main ? tr('mainIncoming') : tr('nIntruders', { n: q.length }));
     sfx.wave();
   }
 
@@ -154,6 +158,7 @@ export class Game {
     const acc = this.waveStats.taps ? this.waveStats.hits / this.waveStats.taps : 1;
     let sub = tr('clearBonus', { n: bonus });
     if (acc >= 0.9) { bonus += 25 * n; sub += ` · ${tr('sharp', { n: 25 * n })}`; }
+    if (!this.waveStats.leaks) { bonus += 30 * n; sub += ` · ${tr('noLeaks', { n: 30 * n })}`; }
     this.score += bonus;
     this.hooks.onBanner?.(tr('cleared', { n }), sub);
     this.breakT = 2.4;
@@ -196,14 +201,26 @@ export class Game {
       x: p.x, y: p.y, tx: p.tx, ty: p.ty, phase: 0,
       hp: def.hp, maxHp: def.hp, r: def.radius,
       speed: def.speed * this.speedMul * fair * rand(0.9, 1.1),
-      t: 0, seed: Math.random() * 10, hitFlash: 0, summonT: 3,
+      t: 0, seed: Math.random() * 10, hitFlash: 0, summonT: def.summons?.every ?? 0,
+      home: { x: p.x, y: p.y },
     };
-    if (type === 'boss') {
-      e.hp = e.maxHp = def.hp + Math.floor(this.wave / 5) * 4;
+    if (def.tier === 1) {
+      e.hp = e.maxHp = def.hp + this.mainCount * 5; // tougher every appearance
+      this.mainCount++;
       sfx.boss();
       navigator.vibrate?.(80);
     }
     this.enemies.push(e);
+    // packs: spawn the rest of the group next to the first one
+    if (!at && def.group > 1) {
+      for (let i = 1; i < def.group; i++) {
+        const a = Math.random() * Math.PI * 2;
+        this.spawn(type, {
+          x: p.x + Math.cos(a) * 0.12, y: p.y + Math.sin(a) * 0.12,
+          tx: p.tx + rand(-0.1, 0.1), ty: p.ty + rand(-0.1, 0.1),
+        });
+      }
+    }
   }
 
   // ---------------------------------------------------------------- input
@@ -249,6 +266,11 @@ export class Game {
       const dx = e.x - e.tx, dy = e.y - e.ty;
       const d = Math.hypot(dx, dy) || 1;
       e.x += (dx / d) * 0.035; e.y += (dy / d) * 0.035;
+      if (e.def.dash) { // jump sideways, so the next tap has to chase it
+        const side = Math.random() < 0.5 ? -1 : 1;
+        e.x += (-dy / d) * 0.16 * side; e.y += (dx / d) * 0.16 * side;
+        if (pointInPoly(BD, e.x, e.y)) { e.x -= (-dy / d) * 0.32 * side; e.y -= (dx / d) * 0.32 * side; }
+      }
       this.burst(e.x, e.y, e.def.color, 6);
       return;
     }
@@ -267,15 +289,16 @@ export class Game {
     if (!viaSweep && near < CLOSE_CALL) {
       pts += 25; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
     }
-    if (e.type === 'boss') this.stats.bosses++;
+    const isMain = e.def.tier === 1;
+    if (isMain) this.stats.mains++;
     this.score += pts;
     this.stats.caught++;
     if (!viaSweep) this.sweep = Math.min(100, this.sweep + e.def.sweepGain);
-    this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', e.type === 'boss' ? 1.6 : 1);
-    this.burst(e.x, e.y, e.def.color, e.type === 'boss' ? 40 : 14);
+    this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
+    this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
     sfx.catch(this.combo);
-    if (e.type === 'boss') { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
-    if (!viaSweep && Math.random() < (e.type === 'boss' ? 1 : POWERUP_CHANCE)) this.dropPowerup(e.x, e.y);
+    if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
+    if (!viaSweep && Math.random() < (isMain ? 1 : POWERUP_CHANCE)) this.dropPowerup(e.x, e.y);
   }
 
   multiplier() { return Math.min(5, 1 + Math.floor((this.combo - 1) / 5)); }
@@ -287,7 +310,7 @@ export class Game {
     sfx.sweep();
     navigator.vibrate?.(60);
     for (const e of [...this.enemies]) {
-      if (e.type === 'boss') this.damage(e, 4, true);
+      if (e.def.tier === 1) this.damage(e, 4, true);
       else this.damage(e, 99, true);
     }
   }
@@ -311,7 +334,23 @@ export class Game {
   }
 
   breach(e) {
-    this.enemies.splice(this.enemies.indexOf(e), 1);
+    // Tier 2 / 3: they get in, you lose points, the game goes on.
+    if (e.def.tier > 1) {
+      this.enemies.splice(this.enemies.indexOf(e), 1);
+      const pen = penaltyOf(e.def);
+      const lost = Math.min(pen, this.score);
+      this.score -= lost;
+      this.stats.leaked++; this.stats.lost += lost; this.waveStats.leaks++;
+      this.combo = 0;
+      this.leakFlash = 0.35;
+      this.shake = Math.max(this.shake, e.def.tier === 2 ? 0.3 : 0.15);
+      sfx.leak();
+      navigator.vibrate?.(50);
+      this.floater(this.sx(e.x), this.sy(e.y) - 20, `−${fmt(pen)} ${tr('leaked')}`, '#ff5a6a', e.def.tier === 2 ? 1.3 : 1);
+      this.burst(e.x, e.y, '#ff5a6a', 12);
+      return;
+    }
+    // Tier 1: a shield throws her back to where she started; otherwise game over.
     if (this.shield > 0) {
       this.shield--;
       this.shake = 0.5;
@@ -320,8 +359,10 @@ export class Game {
       navigator.vibrate?.(120);
       this.floater(this.sx(e.x), this.sy(e.y) - 20, tr('shieldBroken'), '#7cffb2', 1.3);
       this.burst(e.x, e.y, '#7cffb2', 24);
+      e.x = e.home.x; e.y = e.home.y; e.phase = 0;
       return;
     }
+    this.enemies.splice(this.enemies.indexOf(e), 1);
     this.breachAt = { x: e.x, y: e.y, def: e.def, type: e.type };
     this.mode = 'over';
     this.shake = 0.8;
@@ -334,7 +375,6 @@ export class Game {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
       accuracy: this.stats.taps ? Math.round((this.stats.hits / this.stats.taps) * 100) : 0,
-      intruder: this.breachAt ? tr(`char.${this.breachAt.type}`) : '',
       intruderType: this.breachAt?.type ?? '',
     };
   }
@@ -343,6 +383,7 @@ export class Game {
   update(dt) {
     this.shake = Math.max(0, this.shake - dt);
     this.flash = Math.max(0, this.flash - dt);
+    this.leakFlash = Math.max(0, this.leakFlash - dt);
     for (const p of this.particles) {
       p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt;
     }
@@ -398,9 +439,10 @@ export class Game {
       if (e.def.summons) {
         e.summonT -= dt;
         if (e.summonT <= 0) {
-          e.summonT = Math.max(2, 4 - this.wave * 0.1);
+          e.summonT = Math.max(1.8, e.def.summons.every - this.wave * 0.05);
+          const kinds = e.def.summons.types;
           const a = Math.random() * Math.PI * 2;
-          this.spawn('cadre', {
+          this.spawn(kinds[Math.floor(Math.random() * kinds.length)], {
             x: e.x + Math.cos(a) * 0.15, y: e.y + Math.sin(a) * 0.15, tx: e.tx + rand(-0.15, 0.15), ty: e.ty + rand(-0.15, 0.15),
           });
         }
@@ -474,6 +516,7 @@ export class Game {
 
     // border
     const danger = this.enemies.some((e) => e.near < DANGER);
+    const mainDanger = this.enemies.some((e) => e.def.tier === 1 && e.near < DANGER * 2);
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 1.5;
@@ -571,7 +614,11 @@ export class Game {
       ctx.fillStyle = `rgba(255,255,255,${this.flash})`;
       ctx.fillRect(0, 0, this.w, this.h);
     }
-    if (danger && this.mode === 'playing') {
+    if (this.leakFlash > 0) {
+      ctx.fillStyle = `rgba(255,40,60,${this.leakFlash * 0.5})`;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
+    if (mainDanger && this.mode === 'playing') {
       const g = ctx.createRadialGradient(this.w / 2, this.h / 2, Math.min(this.w, this.h) * 0.4, this.w / 2, this.h / 2, Math.max(this.w, this.h) * 0.75);
       g.addColorStop(0, 'rgba(255,0,0,0)');
       g.addColorStop(1, `rgba(255,0,40,${0.18 + 0.08 * Math.sin(t * 10)})`);
@@ -592,6 +639,13 @@ export class Game {
       ctx.strokeStyle = `rgba(255,60,80,${0.5 + 0.5 * Math.sin(t * 14)})`;
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (e.def.tier === 1) { // pulsing aura so the main target is never missed
+      const g = ctx.createRadialGradient(x, y, r * 0.8, x, y, r * 2.2);
+      g.addColorStop(0, `rgba(255,215,0,${0.35 + 0.15 * Math.sin(t * 6)})`);
+      g.addColorStop(1, 'rgba(255,215,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
     }
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -627,7 +681,7 @@ export class Game {
       ctx.fillRect(x - bw / 2, y - r - 11, bw * (e.hp / e.maxHp), bh);
     }
     // name tag
-    if (e.type === 'boss' || e.type === 'leader') {
+    if (e.def.tier <= 2) {
       ctx.font = `700 ${Math.max(9, r * 0.45)}px system-ui, sans-serif`;
       ctx.fillStyle = '#fff';
       ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, y + r + 10);
