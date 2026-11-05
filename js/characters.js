@@ -14,7 +14,8 @@
 //
 // Units: speed is map units per second (1 unit ≈ 100 km), radius is map units.
 // Behaviours: wobble (zig-zag), stealth (fades in and out), dash (jumps sideways
-// when hit), group (spawns as a pack of N), summons ({ every, types }).
+// when hit), group (spawns as a pack of N), summons ({ every, types }),
+// splits ({ into, n }: breaks into n smaller intruders when caught by a tap).
 // ---------------------------------------------------------------------------
 
 export const TIERS = {
@@ -66,6 +67,11 @@ export const CHARACTERS = {
   small4: { // "Pack": arrives in groups of three
     tier: 3, emoji: '😬', color: '#c9a227', sprite: null,
     hp: 1, speed: 0.2, radius: 0.075, points: 8, sweepGain: 3, unlock: 4, group: 3,
+  },
+  small5: { // "Splitter": breaks into two small leaders when caught
+    tier: 3, emoji: '🤡', color: '#2f9e8f', sprite: null,
+    hp: 1, speed: 0.13, radius: 0.11, points: 15, sweepGain: 5, unlock: 5,
+    splits: { into: 'small1', n: 2 },
   },
 };
 

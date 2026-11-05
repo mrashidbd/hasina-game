@@ -4,6 +4,7 @@ import {
 import {
   CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
 } from './characters.js';
+import { PERKS, BASE_MODS, perkOptions } from './perks.js';
 import { sfx } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 
@@ -11,11 +12,12 @@ const PAD = 0.7;            // map units of "India" kept visible around Banglade
 const SPAWN_MIN = 0.5;      // spawn distance outside the border (map units)
 const SPAWN_MAX = 0.8;
 const SPAWN_NOMINAL = (SPAWN_MIN + SPAWN_MAX) / 2;
-const COMBO_WINDOW = 1.5;   // seconds between catches to keep a combo
 const CLOSE_CALL = 0.12;    // distance to border that counts as a close call
 const DANGER = 0.18;        // distance at which an intruder is flagged as dangerous
 const POWERUP_CHANCE = 0.07;
 const MAX_SHIELD = 3;
+const WARN_TIME = 0.7;      // seconds a spawn is telegraphed before the intruder appears
+const PERK_EVERY = 2;       // offer an upgrade after every Nth cleared wave
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -32,7 +34,7 @@ export class Game {
   constructor(canvas, hooks = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.hooks = hooks; // onHud, onBanner, onGameOver
+    this.hooks = hooks; // onHud, onBanner, onGameOver, onPerks
     this.mode = 'menu';
     this.insets = { top: 64, bottom: 90 };
     this.reset();
@@ -59,6 +61,9 @@ export class Game {
     this.floaters = [];
     this.powerups = [];
     this.queue = [];
+    this.warnings = []; // telegraphed spawns: { type, p, t }
+    this.mods = { ...BASE_MODS }; // run modifiers changed by perks
+    this.perks = {};              // perk id -> times taken
     this.spawnT = 0;
     this.breakT = 0;
     this.shake = 0;
@@ -164,6 +169,30 @@ export class Game {
     this.breakT = 2.4;
   }
 
+  /** After the break: offer an upgrade every PERK_EVERY waves, otherwise go on. */
+  afterBreak() {
+    const options = this.wave % PERK_EVERY === 0 ? perkOptions(this, 3) : [];
+    if (!options.length || !this.hooks.onPerks) { this.nextWave(); return; }
+    this.mode = 'perk';
+    this.hooks.onPerks(options);
+  }
+
+  choosePerk(id) {
+    if (this.mode !== 'perk' || !PERKS[id]) return;
+    PERKS[id].apply(this);
+    this.perks[id] = (this.perks[id] || 0) + 1;
+    sfx.power();
+    this.mode = 'playing';
+    this.last = performance.now();
+    this.nextWave();
+  }
+
+  /** 0..1, how much of the combo window is left (for the HUD timer). */
+  comboLeft() {
+    if (this.combo < 2) return 0;
+    return clamp(1 - (this.time - this.lastCatch) / this.mods.comboWindow, 0, 1);
+  }
+
   // ---------------------------------------------------------------- spawning
   spawnPoint() {
     const v = this.view;
@@ -188,14 +217,24 @@ export class Game {
     return null;
   }
 
-  spawn(type, at = null) {
+  /** Pick a spawn point now and show a warning there; the intruder appears WARN_TIME later. */
+  warn(type) {
+    const p = this.spawnPoint();
+    if (p) this.warnings.push({ type, p, t: WARN_TIME });
+  }
+
+  /**
+   * `primary` = a normal wave spawn at a border spawn point (gets the fairness speed
+   * scaling and spawns its whole pack). Summons/splits pass `at` without `primary`.
+   */
+  spawn(type, at = null, primary = !at) {
     const def = CHARACTERS[type];
     const p = at || this.spawnPoint();
     if (!p) return;
     // On narrow screens a spawn can be clamped close to the border. Scale speed so the
     // time-to-border stays about the same as on a large screen (fair on phones).
     let fair = 1;
-    if (!at) fair = clamp(Math.hypot(p.tx - p.x, p.ty - p.y) / SPAWN_NOMINAL, 0.5, 1);
+    if (primary) fair = clamp(Math.hypot(p.tx - p.x, p.ty - p.y) / SPAWN_NOMINAL, 0.5, 1);
     const e = {
       type, def,
       x: p.x, y: p.y, tx: p.tx, ty: p.ty, phase: 0,
@@ -212,7 +251,7 @@ export class Game {
     }
     this.enemies.push(e);
     // packs: spawn the rest of the group next to the first one
-    if (!at && def.group > 1) {
+    if (primary && def.group > 1) {
       for (let i = 1; i < def.group; i++) {
         const a = Math.random() * Math.PI * 2;
         this.spawn(type, {
@@ -243,7 +282,7 @@ export class Game {
     let best = null; let bestD = Infinity;
     for (const e of this.enemies) {
       const d = Math.hypot(this.sx(e.x) - px, this.sy(e.y) - py);
-      const hitR = Math.max(this.rpx(e.r) * 1.25, 26);
+      const hitR = Math.max(this.rpx(e.r) * 1.25, 26) * this.mods.tapRadius;
       if (d < hitR && d < bestD) { best = e; bestD = d; }
     }
     if (!best) {
@@ -265,7 +304,8 @@ export class Game {
       // knock back away from the border
       const dx = e.x - e.tx, dy = e.y - e.ty;
       const d = Math.hypot(dx, dy) || 1;
-      e.x += (dx / d) * 0.035; e.y += (dy / d) * 0.035;
+      const kb = 0.035 * this.mods.knockback;
+      e.x += (dx / d) * kb; e.y += (dy / d) * kb;
       if (e.def.dash) { // jump sideways, so the next tap has to chase it
         const side = Math.random() < 0.5 ? -1 : 1;
         e.x += (-dy / d) * 0.16 * side; e.y += (dx / d) * 0.16 * side;
@@ -279,7 +319,7 @@ export class Game {
 
   catch(e, viaSweep = false) {
     this.enemies.splice(this.enemies.indexOf(e), 1);
-    if (this.time - this.lastCatch < COMBO_WINDOW) this.combo++; else this.combo = 1;
+    if (this.time - this.lastCatch < this.mods.comboWindow) this.combo++; else this.combo = 1;
     this.lastCatch = this.time;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     const mult = this.multiplier();
@@ -293,12 +333,27 @@ export class Game {
     if (isMain) this.stats.mains++;
     this.score += pts;
     this.stats.caught++;
-    if (!viaSweep) this.sweep = Math.min(100, this.sweep + e.def.sweepGain);
+    if (!viaSweep) this.sweep = Math.min(100, this.sweep + e.def.sweepGain * this.mods.sweepGain);
     this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
     this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
     sfx.catch(this.combo);
     if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
-    if (!viaSweep && Math.random() < (isMain ? 1 : POWERUP_CHANCE)) this.dropPowerup(e.x, e.y);
+    if (!viaSweep && Math.random() < (isMain ? 1 : POWERUP_CHANCE + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
+    if (e.def.splits && !viaSweep) this.split(e);
+  }
+
+  /** Splitters break into smaller intruders, pushed back a little from the border. */
+  split(e) {
+    const { into, n } = e.def.splits;
+    const dx = e.x - e.tx, dy = e.y - e.ty;
+    const d = Math.hypot(dx, dy) || 1;
+    for (let i = 0; i < n; i++) {
+      const side = (i - (n - 1) / 2) * 0.14;
+      const x = e.x + (dx / d) * 0.1 + (-dy / d) * side;
+      const y = e.y + (dy / d) * 0.1 + (dx / d) * side;
+      if (pointInPoly(BD, x, y)) continue;
+      this.spawn(into, { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side });
+    }
   }
 
   multiplier() { return Math.min(5, 1 + Math.floor((this.combo - 1) / 5)); }
@@ -324,8 +379,8 @@ export class Game {
   collect(pu) {
     this.powerups.splice(this.powerups.indexOf(pu), 1);
     const def = POWERUPS[pu.kind];
-    if (pu.kind === 'freeze') this.freezeT = 4;
-    if (pu.kind === 'wall') this.wallT = 7;
+    if (pu.kind === 'freeze') this.freezeT = this.mods.freezeTime;
+    if (pu.kind === 'wall') this.wallT = this.mods.wallTime;
     if (pu.kind === 'shield') this.shield = Math.min(MAX_SHIELD, this.shield + 1);
     if (pu.kind === 'charge') this.sweep = Math.min(100, this.sweep + 40);
     this.floater(this.sx(pu.x), this.sy(pu.y) - 24, tr(`pu.${pu.kind}`), def.color, 1.2);
@@ -337,8 +392,7 @@ export class Game {
     // Tier 2 / 3: they get in, you lose points, the game goes on.
     if (e.def.tier > 1) {
       this.enemies.splice(this.enemies.indexOf(e), 1);
-      const pen = penaltyOf(e.def);
-      const lost = Math.min(pen, this.score);
+      const lost = Math.min(penaltyOf(e.def), this.score);
       this.score -= lost;
       this.stats.leaked++; this.stats.lost += lost; this.waveStats.leaks++;
       this.combo = 0;
@@ -346,7 +400,7 @@ export class Game {
       this.shake = Math.max(this.shake, e.def.tier === 2 ? 0.3 : 0.15);
       sfx.leak();
       navigator.vibrate?.(50);
-      this.floater(this.sx(e.x), this.sy(e.y) - 20, `−${fmt(pen)} ${tr('leaked')}`, '#ff5a6a', e.def.tier === 2 ? 1.3 : 1);
+      this.floater(this.sx(e.x), this.sy(e.y) - 20, lost ? `−${fmt(lost)} ${tr('leaked')}` : tr('leaked'), '#ff5a6a', e.def.tier === 2 ? 1.3 : 1);
       this.burst(e.x, e.y, '#ff5a6a', 12);
       return;
     }
@@ -374,6 +428,7 @@ export class Game {
   summary() {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
+      perks: Object.values(this.perks).reduce((a, b) => a + b, 0),
       accuracy: this.stats.taps ? Math.round((this.stats.hits / this.stats.taps) * 100) : 0,
       intruderType: this.breachAt?.type ?? '',
     };
@@ -395,21 +450,27 @@ export class Game {
     this.time += dt;
     this.freezeT = Math.max(0, this.freezeT - dt);
     this.wallT = Math.max(0, this.wallT - dt);
-    if (this.time - this.lastCatch > COMBO_WINDOW) this.combo = 0;
+    if (this.time - this.lastCatch > this.mods.comboWindow) this.combo = 0;
 
     // waves
     if (this.breakT > 0) {
       this.breakT -= dt;
-      if (this.breakT <= 0) this.nextWave();
+      if (this.breakT <= 0) { this.afterBreak(); if (this.mode !== 'playing') return; }
     } else if (this.queue.length) {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
-        this.spawn(this.queue.shift());
-        if (this.wave >= 6 && this.queue.length && Math.random() < 0.2) this.spawn(this.queue.shift());
+        this.warn(this.queue.shift());
+        if (this.wave >= 6 && this.queue.length && Math.random() < 0.2) this.warn(this.queue.shift());
         this.spawnT = this.spawnInterval * rand(0.7, 1.3);
       }
-    } else if (!this.enemies.length) {
+    } else if (!this.enemies.length && !this.warnings.length) {
       this.waveCleared();
+    }
+
+    // telegraphed spawns become intruders
+    for (const w of [...this.warnings]) {
+      w.t -= dt;
+      if (w.t <= 0) { this.warnings.splice(this.warnings.indexOf(w), 1); this.spawn(w.type, w.p, true); }
     }
 
     // power-ups expire
@@ -501,7 +562,7 @@ export class Game {
     ctx.textBaseline = 'middle';
     ctx.font = `600 ${Math.max(10, this.s * 0.11)}px system-ui, sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    for (const l of LABELS) ctx.fillText(l.text, this.sx(l.at[0]), this.sy(l.at[1]));
+    for (const l of LABELS) ctx.fillText(tr(`map.${l.key}`), this.sx(l.at[0]), this.sy(l.at[1]));
 
     // Bangladesh
     ctx.save();
@@ -535,7 +596,7 @@ export class Game {
     ctx.fill();
     ctx.font = `600 ${Math.max(10, this.s * 0.09)}px system-ui, sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText('Dhaka', this.sx(DHAKA[0]), this.sy(DHAKA[1]) + Math.max(12, this.s * 0.1));
+    ctx.fillText(tr('map.dhaka'), this.sx(DHAKA[0]), this.sy(DHAKA[1]) + Math.max(12, this.s * 0.1));
 
     // power-ups
     for (const pu of this.powerups) {
@@ -551,6 +612,9 @@ export class Game {
       ctx.fillText(POWERUPS[pu.kind].emoji, x, y + 1);
       ctx.globalAlpha = 1;
     }
+
+    // spawn warnings
+    for (const w of this.warnings) this.drawWarning(w, t);
 
     // intruders
     for (const e of this.enemies) this.drawEnemy(e, t);
@@ -618,6 +682,7 @@ export class Game {
       ctx.fillStyle = `rgba(255,40,60,${this.leakFlash * 0.5})`;
       ctx.fillRect(0, 0, this.w, this.h);
     }
+    this.drawBossBar();
     if (mainDanger && this.mode === 'playing') {
       const g = ctx.createRadialGradient(this.w / 2, this.h / 2, Math.min(this.w, this.h) * 0.4, this.w / 2, this.h / 2, Math.max(this.w, this.h) * 0.75);
       g.addColorStop(0, 'rgba(255,0,0,0)');
@@ -625,6 +690,41 @@ export class Game {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, this.w, this.h);
     }
+  }
+
+  drawWarning(w, t) {
+    const { ctx } = this;
+    const x = this.sx(w.p.x), y = this.sy(w.p.y);
+    const main = CHARACTERS[w.type].tier === 1;
+    const k = 1 - w.t / WARN_TIME; // 0 → 1 as the spawn approaches
+    const color = main ? '255,215,0' : '255,90,106';
+    const r = (main ? 34 : 22) * (1.4 - 0.6 * k);
+    ctx.globalAlpha = 0.35 + 0.5 * k;
+    ctx.strokeStyle = `rgb(${color})`;
+    ctx.lineWidth = main ? 4 : 2.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.arc(x, y, r, t * 3, t * 3 + Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = `900 ${main ? 22 : 16}px system-ui, sans-serif`;
+    ctx.fillStyle = `rgb(${color})`;
+    ctx.fillText(main ? CHARACTERS[w.type].emoji : '!', x, y);
+    ctx.globalAlpha = 1;
+  }
+
+  /** Big HP bar for the main target, just under the HUD. */
+  drawBossBar() {
+    const boss = this.enemies.find((e) => e.def.tier === 1);
+    if (!boss || this.mode === 'menu') return;
+    const { ctx } = this;
+    const bw = Math.min(360, this.w - 40), bh = 12;
+    const x = (this.w - bw) / 2, y = this.insets.top + 4;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x - 2, y - 2, bw + 4, bh + 4);
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(x, y, bw * Math.max(0, boss.hp / boss.maxHp), bh);
+    ctx.font = '800 11px system-ui, sans-serif';
+    ctx.fillStyle = '#000';
+    ctx.fillText(`${boss.def.emoji} ${tr(`char.${boss.type}`)} · ${fmt(Math.max(0, boss.hp))}/${fmt(boss.maxHp)}`, this.w / 2, y + bh / 2 + 1);
   }
 
   drawEnemy(e, t) {

@@ -1,5 +1,6 @@
 import { Game } from './game.js';
 import { CHARACTERS, POWERUPS, TIERS } from './characters.js';
+import { PERKS } from './perks.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
 
@@ -9,16 +10,16 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
 
-const screens = ['menu', 'howto', 'pause', 'over'];
+const screens = ['menu', 'howto', 'pause', 'perk', 'over'];
 function show(id) {
   for (const s of screens) $(s).classList.toggle('hidden', s !== id);
   const playing = id === null;
-  $('hud').classList.toggle('hidden', !playing && id !== 'pause');
+  $('hud').classList.toggle('hidden', !playing && id !== 'pause' && id !== 'perk');
   $('sweepBtn').classList.toggle('hidden', !playing);
 }
 
 // ----- HUD
-const hud = { score: $('score'), wave: $('wave'), combo: $('combo'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
+const hud = { score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
 const lastHud = {};
 function setText(el, key, v) { if (lastHud[key] !== v) { lastHud[key] = v; el.textContent = v; } }
 function onHud(g) {
@@ -26,6 +27,8 @@ function onHud(g) {
   setText(hud.wave, 'wave', fmt(g.wave));
   const m = g.combo > 1 ? t('comboHud', { n: g.combo, m: g.multiplier() }) : '';
   setText(hud.combo, 'combo', m);
+  const left = `${Math.round(g.comboLeft() * 100)}%`;
+  if (lastHud.comboBar !== left) { lastHud.comboBar = left; hud.comboBar.style.width = left; }
   setText(hud.shield, 'shield', '🛡️'.repeat(g.shield));
   const pct = `${g.sweep}%`;
   if (lastHud.sweep !== pct) { lastHud.sweep = pct; hud.sweepFill.style.width = pct; }
@@ -44,10 +47,16 @@ function onBanner(title, sub) {
   bannerTimer = setTimeout(() => b.classList.remove('show'), 1800);
 }
 
-function onGameOver(s) {
+/** Save a run's score if it beats the stored best. Returns [isRecord, previousBest]. */
+function saveBest(score, wave) {
   const best = store.get('kto-best', { score: 0, wave: 0 });
-  const isRecord = s.score > best.score;
-  if (isRecord) store.set('kto-best', { score: s.score, wave: s.wave });
+  const isRecord = score > best.score;
+  if (isRecord) store.set('kto-best', { score, wave });
+  return [isRecord, best];
+}
+
+function onGameOver(s) {
+  const [isRecord, best] = saveBest(s.score, s.wave);
   $('overScore').textContent = fmt(s.score);
   $('overRecord').classList.toggle('hidden', !isRecord);
   lastResult = s;
@@ -57,20 +66,46 @@ function onGameOver(s) {
   updateBest();
 }
 
+// ----- upgrade choice between waves
+let perkChoices = [];
+function onPerks(options) {
+  perkChoices = options;
+  renderPerks();
+  show('perk');
+}
+function renderPerks() {
+  if (!perkChoices.length) return;
+  $('perkSub').textContent = t('perkSub', { n: game.wave });
+  $('perkList').innerHTML = perkChoices.map((id) => {
+    const lvl = game.perks[id] || 0;
+    const max = PERKS[id].max;
+    return `<button class="perkBtn" data-perk="${id}"><span class="face">${PERKS[id].emoji}</span>
+      <span class="nm">${t(`perkName.${id}`)}<small>${t(`perkDesc.${id}`)}</small></span>
+      ${max < 99 ? `<span class="lvl">${fmt(lvl)}/${fmt(max)}</span>` : ''}</button>`;
+  }).join('');
+}
+$('perkList').onclick = (e) => {
+  const b = e.target.closest('[data-perk]');
+  if (!b) return;
+  perkChoices = [];
+  show(null);
+  game.choosePerk(b.dataset.perk);
+};
+
 let lastBest = 0;
 function renderOver() {
   const s = lastResult;
   if (!s) return;
-  $('overReason').textContent = t('breachReason', { who: s.intruderType ? t(`char.${s.intruderType}`).toLowerCase() : '', wave: s.wave });
+  $('overReason').textContent = t('breachReason', { who: s.intruderType ? t(`char.${s.intruderType}`) : '', wave: s.wave });
   $('overStats').innerHTML = [
     ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
-    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)],
+    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)], ['sPerks', fmt(s.perks)],
     ['sLeaked', fmt(s.leaked)], ['sLost', fmt(s.lost)],
     ['sBest', fmt(lastBest)],
   ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
 }
 
-const game = new Game($('game'), { onHud, onBanner, onGameOver });
+const game = new Game($('game'), { onHud, onBanner, onGameOver, onPerks });
 window.__game = game; // handy for debugging from the console
 let lastResult = null;
 
@@ -90,8 +125,13 @@ $('playBtn').onclick = play;
 $('againBtn').onclick = play;
 $('howBtn').onclick = () => show('howto');
 $('howBack').onclick = () => show('menu');
-$('menuBtn').onclick = () => { game.mode = 'menu'; game.reset(); show('menu'); };
-$('quitBtn').onclick = () => { game.mode = 'menu'; game.reset(); show('menu'); };
+function toMenu() {
+  // Quitting mid-run still counts towards the high score.
+  if (['playing', 'paused', 'perk'].includes(game.mode)) saveBest(game.score, game.wave);
+  game.mode = 'menu'; game.reset(); show('menu'); updateBest();
+}
+$('menuBtn').onclick = toMenu;
+$('quitBtn').onclick = toMenu;
 $('pauseBtn').onclick = () => { game.pause(); show('pause'); };
 $('resumeBtn').onclick = () => { game.resume(); show(null); };
 $('sweepBtn').onclick = () => game.useSweep();
@@ -146,6 +186,7 @@ function applyLang() {
   for (const k of Object.keys(lastHud)) delete lastHud[k];
   updateBest();
   renderOver();
+  renderPerks();
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
 

@@ -25,7 +25,7 @@
   <header id="hud" class="hidden">
     <div class="stat"><small data-i18n="hudScore">SCORE</small><b id="score">0</b></div>
     <div class="stat"><small data-i18n="hudWave">WAVE</small><b id="wave">1</b></div>
-    <div class="mid"><span id="combo"></span><span id="shield"></span></div>
+    <div class="mid"><span id="combo"></span><i id="comboBar"></i><span id="shield"></span></div>
     <button id="muteBtn" class="icon" aria-label="Toggle sound">🔊</button>
     <button id="pauseBtn" class="icon" aria-label="Pause">⏸</button>
   </header>
@@ -72,6 +72,15 @@
       <h2 data-i18n="paused">Paused</h2>
       <button id="resumeBtn" class="primary" data-i18n="resume">▶ Resume</button>
       <button id="quitBtn" data-i18n="quit">Quit to menu</button>
+    </div>
+  </section>
+
+  <!-- Upgrade choice (between waves) -->
+  <section id="perk" class="screen hidden">
+    <div class="panel">
+      <h2 data-i18n="perkTitle">Choose an upgrade</h2>
+      <p id="perkSub" class="tag"></p>
+      <div id="perkList" class="perks"></div>
     </div>
   </section>
 

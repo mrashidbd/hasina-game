@@ -52,11 +52,12 @@ export const MYANMAR = [
 export const DHAKA = proj(90.41, 23.81);
 
 export const LABELS = [
-  { text: 'INDIA', at: proj(87.2, 25.0) },
-  { text: 'INDIA', at: proj(90.9, 26.25) },
-  { text: 'INDIA', at: proj(93.2, 24.6) },
-  { text: 'MYANMAR', at: proj(93.4, 21.2) },
-  { text: 'BAY OF BENGAL', at: proj(90.4, 21.0) },
+  // `key` is looked up as `map.<key>` in js/i18n.js
+  { key: 'india', at: proj(87.2, 25.0) },
+  { key: 'india', at: proj(90.9, 26.25) },
+  { key: 'india', at: proj(93.2, 24.6) },
+  { key: 'myanmar', at: proj(93.4, 21.2) },
+  { key: 'bay', at: proj(90.4, 21.0) },
 ];
 
 export const BBOX = BD.reduce(

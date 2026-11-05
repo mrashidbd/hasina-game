@@ -33,6 +33,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #hud .mid { flex: 1; display: flex; flex-direction: column; align-items: center; font-weight: 700; font-size: 14px; }
 #combo { color: #ffe15a; text-shadow: 0 1px 3px #000; min-height: 18px; }
 #shield { font-size: 14px; min-height: 18px; }
+#comboBar { display: block; height: 3px; width: 0; max-width: 120px; border-radius: 2px; background: #ffe15a; margin: 1px 0 2px; }
 #hud .icon {
   pointer-events: auto; width: 42px; height: 42px; border-radius: 12px;
   border: 1px solid var(--line); background: rgba(0,0,0,.35); font-size: 18px;
@@ -116,13 +117,19 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
 .table b { color: #ffe15a; font-variant-numeric: tabular-nums; }
 .table b small { font-size: 11px; opacity: .7; font-weight: 400; }
 
+.perks { display: flex; flex-direction: column; gap: 8px; }
+.panel button.perkBtn { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; }
+.perkBtn .face { font-size: 28px; flex: none; }
+.perkBtn .nm { display: flex; flex-direction: column; }
+.perkBtn .nm small { font-weight: 400; opacity: .7; font-size: 13px; }
+.perkBtn .lvl { margin-left: auto; font-size: 12px; opacity: .6; }
+
 .bigscore { font-size: 56px; font-weight: 900; color: #ffe15a; font-variant-numeric: tabular-nums; line-height: 1; }
 .record { font-weight: 800; color: var(--mint); animation: pulse2 .7s infinite alternate; }
 @keyframes pulse2 { to { transform: scale(1.08); } }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0; }
 .stats div { display: flex; justify-content: space-between; gap: 6px; padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.05); font-size: 13px; }
 .stats span { opacity: .7; text-align: left; }
-.stats div:last-child { grid-column: span 2; }
 
 @media (max-height: 640px) {
   .panel { padding: 16px; gap: 7px; }

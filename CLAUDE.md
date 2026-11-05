@@ -32,7 +32,12 @@ There is no test suite. Quick syntax check of every module:
 for f in js/*.js sw.js; do node --check "$f"; done
 ```
 In the browser console, `window.__game` is the live `Game` instance (e.g.
-`__game.sweep = 100`, `__game.shield = 3`, `__game.wave = 11; __game.nextWave()`).
+`__game.sweep = 100`, `__game.shield = 3`, `__game.wave = 11; __game.nextWave()`,
+`__game.spawn('hasina')`, `__game.wave = 4; __game.waveCleared()` → upgrade screen).
+If the Chrome extension isn't available, a headless Chromium from the Playwright cache
+(`~/.cache/ms-playwright/chromium_headless_shell-*`) driven over CDP with Node's built-in
+`WebSocket` works for screenshots and `Runtime.evaluate` checks (no npm install needed).
+Port 8080 is often already taken on the user's machine; use another (e.g. 8765).
 Tip: when testing with a service worker active, hard-reload or use DevTools →
 Application → "Update on reload", otherwise you may see the cached old version.
 
@@ -44,6 +49,7 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), share, keyboard, PWA install, SW registration, renders how-to tables from data |
 | `js/game.js` | `Game` class: waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
 | `js/characters.js` | **Roster + balance data**: `TIERS`, `CHARACTERS`, `POWERUPS`, `MAIN_ID`, `isMainWave` |
+| `js/perks.js` | Between-wave upgrades: `BASE_MODS` (per-run modifiers), `PERKS`, `perkOptions()` |
 | `js/map.js` | Bangladesh outline (lon/lat, edges tagged India/Myanmar/Coast), projection, sea/Myanmar polygons, geometry helpers |
 | `js/i18n.js` | `en` / `bn` strings, `t(key, vars)`, `fmt(n)` (Bangla digits), language detection |
 | `js/audio.js` | `sfx.*` sound effects, mute state |
@@ -56,9 +62,11 @@ Application → "Update on reload", otherwise you may see the cached old version
    `t('key')` in JS or `data-i18n="key"` in HTML. Numbers shown to players go through
    `fmt()` (or pass numbers as `t()` vars, which are auto-formatted).
 3. **Balance lives in data, not code.** Character stats → `js/characters.js`. Global
-   tuning constants → top of `js/game.js`. Wave formulas → `Game.nextWave()`.
+   tuning constants → top of `js/game.js`. Values a perk can change → `BASE_MODS` in
+   `js/perks.js` (read via `game.mods.*`, never a constant). Wave formulas → `Game.nextWave()`.
 4. **New character** = add entry in `CHARACTERS` + `char.<id>` and `trait.<id>` in both
    languages. The how-to roster table and wave mix pick it up automatically.
+   **New perk** = entry in `PERKS` + `perkName.<id>` / `perkDesc.<id>` in both languages.
 5. **New asset file** (sprite, sound, etc.) → add it to `ASSETS` in `sw.js`.
 6. **Any shipped change → bump `VERSION` in `sw.js`** (e.g. `kto-v3` → `kto-v4`), or
    installed players keep the old cached build.
