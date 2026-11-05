@@ -1,6 +1,7 @@
 import { Game } from './game.js';
 import { CHARACTERS, POWERUPS } from './characters.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
+import { t, fmt, getLang, setLang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -21,9 +22,9 @@ const hud = { score: $('score'), wave: $('wave'), combo: $('combo'), shield: $('
 const lastHud = {};
 function setText(el, key, v) { if (lastHud[key] !== v) { lastHud[key] = v; el.textContent = v; } }
 function onHud(g) {
-  setText(hud.score, 'score', g.score.toLocaleString());
-  setText(hud.wave, 'wave', String(g.wave));
-  const m = g.combo > 1 ? `${g.combo} combo · x${g.multiplier()}` : '';
+  setText(hud.score, 'score', fmt(g.score));
+  setText(hud.wave, 'wave', fmt(g.wave));
+  const m = g.combo > 1 ? t('comboHud', { n: g.combo, m: g.multiplier() }) : '';
   setText(hud.combo, 'combo', m);
   setText(hud.shield, 'shield', '🛡️'.repeat(g.shield));
   const pct = `${g.sweep}%`;
@@ -47,17 +48,25 @@ function onGameOver(s) {
   const best = store.get('kto-best', { score: 0, wave: 0 });
   const isRecord = s.score > best.score;
   if (isRecord) store.set('kto-best', { score: s.score, wave: s.wave });
-  $('overScore').textContent = s.score.toLocaleString();
+  $('overScore').textContent = fmt(s.score);
   $('overRecord').classList.toggle('hidden', !isRecord);
-  $('overReason').textContent = `A ${s.intruder.toLowerCase()} slipped across the border on wave ${s.wave}.`;
-  $('overStats').innerHTML = [
-    ['Wave reached', s.wave], ['Intruders caught', s.caught], ['Best combo', s.bestCombo],
-    ['Accuracy', `${s.accuracy}%`], ['Close calls', s.closeCalls], ['Bosses stopped', s.bosses],
-    ['Best score', Math.max(best.score, s.score).toLocaleString()],
-  ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
   lastResult = s;
+  lastBest = Math.max(best.score, s.score);
+  renderOver();
   show('over');
   updateBest();
+}
+
+let lastBest = 0;
+function renderOver() {
+  const s = lastResult;
+  if (!s) return;
+  $('overReason').textContent = t('breachReason', { who: s.intruderType ? t(`char.${s.intruderType}`).toLowerCase() : '', wave: s.wave });
+  $('overStats').innerHTML = [
+    ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
+    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sBoss', fmt(s.bosses)],
+    ['sBest', fmt(lastBest)],
+  ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
 }
 
 const game = new Game($('game'), { onHud, onBanner, onGameOver });
@@ -66,7 +75,7 @@ let lastResult = null;
 
 function updateBest() {
   const best = store.get('kto-best', { score: 0, wave: 0 });
-  $('bestLine').textContent = best.score ? `Best: ${best.score.toLocaleString()} · wave ${best.wave}` : 'No record yet — be the first guard!';
+  $('bestLine').textContent = best.score ? t('best', { score: best.score, wave: best.wave }) : t('noBest');
 }
 
 function play() {
@@ -93,11 +102,11 @@ syncMute();
 
 $('shareBtn').onclick = async () => {
   const s = lastResult;
-  const text = `I kept them out of Bangladesh until wave ${s?.wave ?? 1} and scored ${(s?.score ?? 0).toLocaleString()} points in Keep Them Out! Can you beat me?`;
+  const text = t('shareText', { wave: s?.wave ?? 1, score: s?.score ?? 0 });
   const url = location.href.split('#')[0];
   try {
-    if (navigator.share) await navigator.share({ title: 'Keep Them Out!', text, url });
-    else { await navigator.clipboard.writeText(`${text} ${url}`); onBanner('Copied!', 'Share text copied to clipboard'); }
+    if (navigator.share) await navigator.share({ title: t('title'), text, url });
+    else { await navigator.clipboard.writeText(`${text} ${url}`); onBanner(t('copied'), t('copiedSub')); }
   } catch { /* user cancelled */ }
 };
 
@@ -115,17 +124,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && game.mode === 'playing') { game.pause(); show('pause'); }
 });
 
-// ----- how-to roster table
-$('roster').innerHTML = Object.values(CHARACTERS).map((c) => `
-  <div class="row"><span class="face" style="background:${c.color}">${c.emoji}</span>
-  <span class="nm">${c.name}<small>${c.hp > 1 ? `${c.hp}+ taps` : '1 tap'} · from wave ${c.unlock}</small></span>
-  <b>${c.points}</b></div>`).join('');
-$('powers').innerHTML = Object.entries(POWERUPS).map(([k, p]) => {
-  const desc = { freeze: 'Freezes everyone for 4s', wall: 'Slows intruders for 7s', shield: 'Absorbs one breach (max 3)', charge: 'Fills the Sweep meter' }[k];
-  return `<div class="row"><span class="face">${p.emoji}</span><span class="nm">${p.label.replace('!', '')}<small>${desc}</small></span></div>`;
-}).join('');
+// ----- language: static text (data-i18n), how-to tables, dynamic lines
+function applyLang() {
+  const lang = getLang();
+  document.documentElement.lang = lang;
+  document.title = t('title');
+  for (const el of document.querySelectorAll('[data-i18n]')) el.innerHTML = t(el.dataset.i18n);
+  $('rules').innerHTML = t('rules').map((li) => `<li>${li}</li>`).join('');
+  $('roster').innerHTML = Object.entries(CHARACTERS).map(([k, c]) => `
+    <div class="row"><span class="face" style="background:${c.color}">${c.emoji}</span>
+    <span class="nm">${t(`char.${k}`)}<small>${c.hp > 1 ? t('taps', { n: `${fmt(c.hp)}+` }) : t('tap1')} · ${t('fromWave', { n: c.unlock })}</small></span>
+    <b>${fmt(c.points)} <small>${t('pts')}</small></b></div>`).join('');
+  $('powers').innerHTML = Object.entries(POWERUPS).map(([k, p]) => `
+    <div class="row"><span class="face">${p.emoji}</span>
+    <span class="nm">${t(`puName.${k}`)}<small>${t(`puDesc.${k}`)}</small></span></div>`).join('');
+  for (const k of Object.keys(lastHud)) delete lastHud[k];
+  updateBest();
+  renderOver();
+}
+$('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
 
-updateBest();
+applyLang();
 show('menu');
 
 // ----- PWA: install prompt + service worker

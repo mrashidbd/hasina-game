@@ -3,10 +3,12 @@ import {
 } from './map.js';
 import { CHARACTERS, POWERUPS } from './characters.js';
 import { sfx } from './audio.js';
+import { t as tr, fmt } from './i18n.js';
 
 const PAD = 0.7;            // map units of "India" kept visible around Bangladesh
 const SPAWN_MIN = 0.5;      // spawn distance outside the border (map units)
 const SPAWN_MAX = 0.8;
+const SPAWN_NOMINAL = (SPAWN_MIN + SPAWN_MAX) / 2;
 const COMBO_WINDOW = 1.5;   // seconds between catches to keep a combo
 const CLOSE_CALL = 0.12;    // distance to border that counts as a close call
 const DANGER = 0.18;        // distance at which an intruder is flagged as dangerous
@@ -142,7 +144,7 @@ export class Game {
     this.spawnInterval = Math.max(0.3, 1.5 * Math.pow(0.92, n - 1));
     this.speedMul = Math.min(2.1, 1 + 0.07 * (n - 1));
     this.spawnT = 1.2;
-    this.hooks.onBanner?.(`Wave ${n}`, n % 5 === 0 ? '⚠️ Boss incoming!' : `${q.length} intruders`);
+    this.hooks.onBanner?.(tr('wave', { n }), n % 5 === 0 ? tr('bossIncoming') : tr('nIntruders', { n: q.length }));
     sfx.wave();
   }
 
@@ -150,10 +152,10 @@ export class Game {
     const n = this.wave;
     let bonus = 50 * n;
     const acc = this.waveStats.taps ? this.waveStats.hits / this.waveStats.taps : 1;
-    let sub = `Clear bonus +${bonus}`;
-    if (acc >= 0.9) { bonus += 25 * n; sub += ` · Sharpshooter +${25 * n}`; }
+    let sub = tr('clearBonus', { n: bonus });
+    if (acc >= 0.9) { bonus += 25 * n; sub += ` · ${tr('sharp', { n: 25 * n })}`; }
     this.score += bonus;
-    this.hooks.onBanner?.(`Wave ${n} cleared!`, sub);
+    this.hooks.onBanner?.(tr('cleared', { n }), sub);
     this.breakT = 2.4;
   }
 
@@ -185,11 +187,15 @@ export class Game {
     const def = CHARACTERS[type];
     const p = at || this.spawnPoint();
     if (!p) return;
+    // On narrow screens a spawn can be clamped close to the border. Scale speed so the
+    // time-to-border stays about the same as on a large screen (fair on phones).
+    let fair = 1;
+    if (!at) fair = clamp(Math.hypot(p.tx - p.x, p.ty - p.y) / SPAWN_NOMINAL, 0.5, 1);
     const e = {
       type, def,
       x: p.x, y: p.y, tx: p.tx, ty: p.ty, phase: 0,
       hp: def.hp, maxHp: def.hp, r: def.radius,
-      speed: def.speed * this.speedMul * rand(0.9, 1.1),
+      speed: def.speed * this.speedMul * fair * rand(0.9, 1.1),
       t: 0, seed: Math.random() * 10, hitFlash: 0, summonT: 3,
     };
     if (type === 'boss') {
@@ -224,7 +230,7 @@ export class Game {
       if (d < hitR && d < bestD) { best = e; bestD = d; }
     }
     if (!best) {
-      if (this.combo > 0) this.floater(px, py, 'combo lost', '#ff8a8a', 0.6, true);
+      if (this.combo > 0) this.floater(px, py, tr('comboLost'), '#ff8a8a', 0.6, true);
       this.combo = 0;
       sfx.miss();
       this.ripple(px, py);
@@ -257,9 +263,9 @@ export class Game {
     const mult = this.multiplier();
     let pts = viaSweep ? Math.round(e.def.points * 0.5) : e.def.points * mult;
     const near = distToPoly(BD, e.x, e.y);
-    let label = `+${pts}`;
+    let label = `+${fmt(pts)}`;
     if (!viaSweep && near < CLOSE_CALL) {
-      pts += 25; this.stats.closeCalls++; label = `+${pts} CLOSE CALL!`;
+      pts += 25; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
     }
     if (e.type === 'boss') this.stats.bosses++;
     this.score += pts;
@@ -299,7 +305,7 @@ export class Game {
     if (pu.kind === 'wall') this.wallT = 7;
     if (pu.kind === 'shield') this.shield = Math.min(MAX_SHIELD, this.shield + 1);
     if (pu.kind === 'charge') this.sweep = Math.min(100, this.sweep + 40);
-    this.floater(this.sx(pu.x), this.sy(pu.y) - 24, def.label, def.color, 1.2);
+    this.floater(this.sx(pu.x), this.sy(pu.y) - 24, tr(`pu.${pu.kind}`), def.color, 1.2);
     this.burst(pu.x, pu.y, def.color, 16);
     sfx.power();
   }
@@ -312,11 +318,11 @@ export class Game {
       this.flash = 0.3;
       sfx.shield();
       navigator.vibrate?.(120);
-      this.floater(this.sx(e.x), this.sy(e.y) - 20, 'SHIELD BROKEN!', '#7cffb2', 1.3);
+      this.floater(this.sx(e.x), this.sy(e.y) - 20, tr('shieldBroken'), '#7cffb2', 1.3);
       this.burst(e.x, e.y, '#7cffb2', 24);
       return;
     }
-    this.breachAt = { x: e.x, y: e.y, def: e.def };
+    this.breachAt = { x: e.x, y: e.y, def: e.def, type: e.type };
     this.mode = 'over';
     this.shake = 0.8;
     sfx.over();
@@ -328,7 +334,8 @@ export class Game {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
       accuracy: this.stats.taps ? Math.round((this.stats.hits / this.stats.taps) * 100) : 0,
-      intruder: this.breachAt?.def.name ?? '',
+      intruder: this.breachAt ? tr(`char.${this.breachAt.type}`) : '',
+      intruderType: this.breachAt?.type ?? '',
     };
   }
 
@@ -504,6 +511,15 @@ export class Game {
 
     // intruders
     for (const e of this.enemies) this.drawEnemy(e, t);
+    if (this.mode === 'playing' && this.stats.caught === 0 && this.enemies.length) {
+      const e = this.enemies[0];
+      const x = this.sx(e.x), y = this.sy(e.y) - this.rpx(e.r) - 22 - Math.abs(Math.sin(t * 6)) * 8;
+      ctx.font = `800 18px system-ui, sans-serif`;
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(tr('tapHint'), x, y);
+      ctx.fillStyle = '#ffe15a';
+      ctx.fillText(tr('tapHint'), x, y);
+    }
 
     // breach marker
     if (this.breachAt) {
@@ -614,7 +630,7 @@ export class Game {
     if (e.type === 'boss' || e.type === 'leader') {
       ctx.font = `700 ${Math.max(9, r * 0.45)}px system-ui, sans-serif`;
       ctx.fillStyle = '#fff';
-      ctx.fillText(e.def.name.toUpperCase(), x, y + r + 10);
+      ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, y + r + 10);
     }
     ctx.globalAlpha = 1;
   }

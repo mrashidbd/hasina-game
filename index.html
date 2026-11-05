@@ -23,15 +23,15 @@
 
   <!-- HUD -->
   <header id="hud" class="hidden">
-    <div class="stat"><small>SCORE</small><b id="score">0</b></div>
-    <div class="stat"><small>WAVE</small><b id="wave">1</b></div>
+    <div class="stat"><small data-i18n="hudScore">SCORE</small><b id="score">0</b></div>
+    <div class="stat"><small data-i18n="hudWave">WAVE</small><b id="wave">1</b></div>
     <div class="mid"><span id="combo"></span><span id="shield"></span></div>
     <button id="muteBtn" class="icon" aria-label="Toggle sound">🔊</button>
     <button id="pauseBtn" class="icon" aria-label="Pause">⏸</button>
   </header>
 
   <button id="sweepBtn" class="hidden" aria-label="Sweep — catch everyone on screen">
-    <span id="sweepFill"></span><span class="lbl">⚡ SWEEP</span>
+    <span id="sweepFill"></span><span class="lbl" data-i18n="sweep">⚡ SWEEP</span>
   </button>
 
   <div id="banner"><div id="bannerTitle"></div><div id="bannerSub"></div></div>
@@ -40,59 +40,52 @@
   <section id="menu" class="screen">
     <div class="panel">
       <div class="logo">🛡️🇧🇩</div>
-      <h1>Keep Them Out!</h1>
-      <p class="tag">The crooks are trying to sneak back in from across the border.<br>Tap them before they reach Bangladesh!</p>
-      <button id="playBtn" class="primary">▶ PLAY</button>
-      <button id="howBtn">How to play &amp; points</button>
-      <button id="installBtn" class="hidden">📲 Install app</button>
-      <p id="iosHint" class="hint hidden">On iPhone: tap <b>Share</b> → <b>Add to Home Screen</b> to install.</p>
+      <h1 data-i18n="title">Keep Them Out!</h1>
+      <p class="tag" data-i18n="tagline"></p>
+      <button id="playBtn" class="primary" data-i18n="play">▶ PLAY</button>
+      <button id="howBtn" data-i18n="how">How to play &amp; points</button>
+      <button id="installBtn" class="hidden" data-i18n="install">📲 Install app</button>
+      <p id="iosHint" class="hint hidden" data-i18n="iosHint"></p>
       <p id="bestLine" class="best"></p>
-      <p class="hint">Characters are placeholders. Satire / fan game.</p>
+      <button id="langBtn" class="lang" data-i18n="langBtn">বাংলা</button>
+      <p class="hint" data-i18n="disclaimer"></p>
     </div>
   </section>
 
   <!-- How to play -->
   <section id="howto" class="screen hidden">
     <div class="panel scroll">
-      <h2>How to play</h2>
-      <ul class="rules">
-        <li><b>Tap / click</b> intruders to catch them and send them back.</li>
-        <li>If <b>anyone crosses the border</b> into Bangladesh — <b>game over</b> (unless you have a 🛡️ shield).</li>
-        <li>Catch quickly in a row for a <b>combo</b>: every 5 catches raises the multiplier (up to <b>x5</b>). Missed taps break the combo.</li>
-        <li>Catch someone right at the border: <b>Close call +25</b>.</li>
-        <li>Clear a wave: <b>+50 × wave</b>. 90%+ accuracy in a wave: <b>+25 × wave</b>.</li>
-        <li>Catches fill the <b>⚡ Sweep</b> meter. When full, press it (or <kbd>Space</kbd>) to catch everyone on screen (half points, bosses take 4 damage).</li>
-        <li>A <b>Boss</b> arrives every 5th wave and keeps calling in cadres. Bosses always drop a power-up.</li>
-      </ul>
-      <h3>Intruders</h3>
+      <h2 data-i18n="howTitle">How to play</h2>
+      <ul class="rules" id="rules"></ul>
+      <h3 data-i18n="intruders">Intruders</h3>
       <div id="roster" class="table"></div>
-      <h3>Power-ups <small>(tap to collect)</small></h3>
+      <h3><span data-i18n="powerups">Power-ups</span> <small data-i18n="tapCollect">(tap to collect)</small></h3>
       <div id="powers" class="table"></div>
-      <p class="hint">Desktop: <kbd>Space</kbd> sweep · <kbd>P</kbd>/<kbd>Esc</kbd> pause · <kbd>Enter</kbd> play</p>
-      <button id="howBack" class="primary">Got it</button>
+      <p class="hint" data-i18n="keys"></p>
+      <button id="howBack" class="primary" data-i18n="gotIt">Got it</button>
     </div>
   </section>
 
   <!-- Pause -->
   <section id="pause" class="screen hidden">
     <div class="panel">
-      <h2>Paused</h2>
-      <button id="resumeBtn" class="primary">▶ Resume</button>
-      <button id="quitBtn">Quit to menu</button>
+      <h2 data-i18n="paused">Paused</h2>
+      <button id="resumeBtn" class="primary" data-i18n="resume">▶ Resume</button>
+      <button id="quitBtn" data-i18n="quit">Quit to menu</button>
     </div>
   </section>
 
   <!-- Game over -->
   <section id="over" class="screen hidden">
     <div class="panel">
-      <h2 class="bad">BORDER BREACHED!</h2>
+      <h2 class="bad" data-i18n="breached">BORDER BREACHED!</h2>
       <p id="overReason" class="tag"></p>
       <div class="bigscore" id="overScore">0</div>
-      <div id="overRecord" class="record hidden">🏆 NEW RECORD!</div>
+      <div id="overRecord" class="record hidden" data-i18n="record">🏆 NEW RECORD!</div>
       <div id="overStats" class="stats"></div>
-      <button id="againBtn" class="primary">↻ Play again</button>
-      <button id="shareBtn">Share score</button>
-      <button id="menuBtn">Menu</button>
+      <button id="againBtn" class="primary" data-i18n="again">↻ Play again</button>
+      <button id="shareBtn" data-i18n="share">Share score</button>
+      <button id="menuBtn" data-i18n="menu">Menu</button>
     </div>
   </section>
 
