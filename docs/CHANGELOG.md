@@ -3,6 +3,18 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-09 — v2 phases C + D (branch `v2`)
+- **Accurate map** (opencode, 2 rounds, reviewed): `tools/build-map.mjs` turns Natural Earth
+  10m data into `js/data/map-bd.js`: 340-point mainland with I/M/C edge tags, 15 islands,
+  clipped India / Myanmar / Nepal / Bhutan / China land. Real coastlines are drawn and spawns
+  must be on Indian land. Review fix: hairline gaps between countries closed by stroking.
+  Verified: cities inside/outside correctly, ~75% spawn-point success, reproducible output.
+- **Hero select + kick and flee** (opencode, reviewed): pick Farmer / Student ♂ / Student ♀ /
+  Common People; every hit shows the hero kicking; caught intruders run 300 px back to India
+  and fade. Sweep shows all four heroes. Review fix: Sweep played one sound per intruder.
+- agy could not complete unattended tasks (print mode stops at permission prompts); see
+  CLAUDE.md "Team workflow". SW `kto-v7`.
+
 ## 2026-11-09 — v2 plan, prompt docs, config refactor (branch `v2`)
 - New workflow: Claude reviews; opencode/agy write code (see CLAUDE.md "Team workflow").
 - `docs/PLAN-v2.md` (approved), `docs/prompts/enemy-characters.md`,

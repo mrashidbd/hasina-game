@@ -47,14 +47,14 @@ Written by Claude (needs judgment on tone and likeness), reviewed by the user.
   `assets/heroes/<id>/{ready,kick}.png`, `assets/sfx/<id>.mp3`. `sw.js` ASSETS built
   from the manifest.
 
-### C. Accurate map — script delegated, run + checked by Claude
+### C. Accurate map — script delegated, run + checked by Claude ✅ done 2026-11-09 (opencode, 2 rounds)
 - `tools/build-map.mjs`: reads Natural Earth GeoJSON, extracts BD (mainland + major
   islands for drawing), India and Myanmar, simplifies to ~300–500 points, tags each BD
   edge I/M/C by proximity to the neighbour polygons, writes `js/data/map-bd.js`.
 - `js/map.js` keeps the same exports (`BD`, `INDIA_EDGES`, `SEA`, `MYANMAR`, …) so
   `game.js` changes are minimal. Check: point-in-polygon perf, spawn logic, visuals.
 
-### D. Kick & flee mechanic + hero select — delegate
+### D. Kick & flee mechanic + hero select — delegate ✅ done 2026-11-09 (opencode)
 - Hero-select screen between menu and play (remembered in localStorage).
 - Tap → hero sprite appears behind the intruder, short kick animation (~0.25 s),
   impact burst, per-character kick sound.

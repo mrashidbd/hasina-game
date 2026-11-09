@@ -1,6 +1,6 @@
 // Service worker: offline-first cache for the whole game.
 // Bump VERSION whenever you deploy changes so players get the update.
-const VERSION = 'kto-v6';
+const VERSION = 'kto-v7';
 const ASSETS = [
   './',
   './index.html',

@@ -48,6 +48,7 @@ three **hooks** passed to the constructor by `main.js`:
 | `onPerks(ids)` | after the break following every `PERK_EVERY`-th wave | shows the upgrade screen; main.js calls `game.choosePerk(id)` |
 
 ## Game modes
+`Game.hero` is the chosen hero id (`HEROES`), set by `start(heroId)`.
 `Game.mode` is one of `'menu' | 'playing' | 'paused' | 'perk' | 'over'`
 (`'perk'` = simulation stopped while the upgrade screen is open).
 - The render loop (`loop` → `update` → `render` → `onHud`) **always runs**, including
@@ -69,8 +70,21 @@ three **hooks** passed to the constructor by `main.js`:
 - Particles and floaters are stored in **screen pixels**, enemies/power-ups in map units.
 
 ## Map data (`js/map.js`)
-- `RAW`: ~45 vertices clockwise from the northern tip, each tagged with the type of the
-  edge that starts there: `I` India, `M` Myanmar, `C` coast.
+- Source: Natural Earth 10m Admin-0 countries (public domain). `tools/build-map.mjs`
+  takes Bangladesh's mainland ring (~1830 pts), tags every vertex by the edge that starts
+  there (`I` India / `M` Myanmar / `C` coast: within 0.0015° of that neighbour's outline),
+  simplifies each same-tag run separately with Douglas–Peucker (0.02 map units ≈ 2 km, so
+  tag boundaries stay exact) → ~340 pts, plus the 15 biggest islands and neighbour land.
+  Output: `js/data/map-bd.js` (generated, committed). Re-run:
+  `node tools/build-map.mjs <ne_10m_admin_0_countries.geojson> [--tolerance 0.02] [--preview out.svg]`.
+- Neighbour land (`INDIA_LAND`, `MYANMAR_LAND`, `OTHER_LAND` = Nepal/Bhutan/China) is
+  clipped to lon 78–102 / lat 14–32 (Sutherland–Hodgman) and simplified at 0.05.
+- `map.js` projects that data; `MAINLAND` vertices are clockwise from the northern tip.
+  Exports used by the engine: `BD`, `INDIA_EDGES`/`INDIA_LEN` (spawn edges), `INDIA` and
+  `OTHER_LAND` (arrays of rings), `MYANMAR`, `ISLANDS` (drawing only), `DHAKA`, `LABELS`,
+  `BBOX`. `SEA` is still exported but unused.
+- Rendering: canvas filled with the sea gradient, then land shapes (each also stroked in its
+  own colour to hide hairline gaps between separately simplified countries), then BD + islands.
 - Exports: `BD` (projected polygon), `INDIA_EDGES` (`{a, b, len}`), `INDIA_LEN`,
   `SEA` and `MYANMAR` polygons (for drawing and to reject spawns), `DHAKA`, `LABELS`,
   `BBOX`, `pointInPoly`, `distToPoly`.
@@ -97,7 +111,8 @@ three **hooks** passed to the constructor by `main.js`:
 ## Spawning
 - `spawnPoint()`: pick a random point along `INDIA_EDGES` (length-weighted), push it
   outward along the edge normal by `SPAWN_MIN..SPAWN_MAX` (0.5–0.8 units), clamp to
-  the visible view, reject if inside BD / sea / Myanmar or < 0.3 from the border.
+  the visible view, reject unless it's inside one of the `INDIA` rings, outside BD and
+  ≥ 0.3 from the border.
   40 tries, else `null` (spawn skipped). Returns spawn `x,y` and border target `tx,ty`
   (slightly inside the border).
 - `spawn(type, at?, primary = !at)`: creates the enemy object. If `primary`, speed is
@@ -118,6 +133,25 @@ three **hooks** passed to the constructor by `main.js`:
 Movement: head to `(tx,ty)`; within 0.03 switch `phase = 1` and head to `DHAKA`.
 `wobble` adds a sinusoidal sideways component. A breach is detected by
 `pointInPoly(BD, x, y)` every frame → `breach(e)`.
+
+## Heroes, kicks and fleeing
+- Menu ▶ PLAY → `#heroSelect` (main.js `renderHeroes`), choice saved in `kto-hero`;
+  "Play again" reuses it. `game.start(heroId)`.
+- Every successful hit calls `spawnKick(e, heroId, quiet)`: pushes `{hero, x, y, dirX, dirY, t, life}`
+  to `this.kicks` (screen px), placed behind the intruder (against the flee direction) by
+  `rpx(r) + CONFIG.kick.heroOffsetPx`, and plays the hero's sound (`HEROES[id].sound || 'kick'`).
+  `drawKick`: `ready` pose for `windupTime`, then `kick`; emoji + 🦶 fallback; mirrored when
+  `dirX < 0` (art faces right); pop-in and fade.
+- Flee direction `fleeVector(e)`: from the border target `(tx,ty)` to the spawn `home`
+  (outward, back to India).
+- On a catch the intruder leaves `this.enemies` (can't be tapped, can't breach, doesn't
+  block wave-clear) and joins `this.fleeing` (screen px) moving at `fleeSpeedPx` until it
+  has travelled `fleeDistancePx` (300), fading out, with a hop, wobble, dust and the
+  `kicked` pose. Kicks and fleeing animate in every mode except `paused`/`perk`.
+- Non-final hits: knockback/dash as before + kick + small hop (`e.hop`).
+- Sweep: kick visuals cycle through all heroes (`CONFIG.kick.sweepAllHeroes`); sounds are
+  suppressed per intruder (one `sweep` sound instead).
+- Reaction sound on a catch: `play(e.def.sound)` if set, else the pitched `catch` synth.
 
 ## Input & scoring
 - `onPointer` (pointerdown on canvas): power-ups first (30 px radius, doesn't count as
@@ -156,11 +190,11 @@ in `collect()` + `pu.*`, `puName.*`, `puDesc.*` strings.
 India background → Myanmar → sea gradient → labels → Bangladesh fill + red flag disc
 (clipped) → border outline (India border glows mint / pulses red when any enemy is
 within `DANGER`, orange & thick while wall is active) → Dhaka dot + label → power-ups →
-spawn warnings (`drawWarning`) → enemies (`drawEnemy`: danger ring, tier-1 gold aura, shadow, body/sprite/emoji, frozen
+spawn warnings (`drawWarning`) → fleeing intruders (`drawFleeing`) → enemies (`drawEnemy`: danger ring, tier-1 gold aura, shadow, body/sprite/emoji, frozen
 tint, HP bar if maxHp>1, name tag for tier ≤ 2) → first-catch "TAP!" hint → breach
 marker → particles → floaters → full-screen overlays (freeze tint, sweep flash, leak
 flash, `drawBossBar` (gold HP bar under the HUD while tier 1 is alive), red vignette
-when tier 1 is near the border). Screen shake translates the
+when tier 1 is near the border). Hero kicks (`drawKick`) are drawn right after the enemies. Screen shake translates the
 whole frame. DPR is capped at 2.
 
 Map labels come from `LABELS[].key` → `t('map.<key>')`, so they follow the language.
@@ -171,6 +205,7 @@ Map labels come from `LABELS[].key` → `t('map.<key>')`, so they follow the lan
 | `kto-best` | `{ score, wave }` |
 | `kto-lang` | `'en'` / `'bn'` (default: Bangla if `navigator.language` starts with `bn`) |
 | `kto-muted` | `'1'` / `'0'` |
+| `kto-hero` | chosen hero id (`farmer`, `studentM`, `studentF`, `common`) |
 
 All access is wrapped in try/catch (private mode safe).
 

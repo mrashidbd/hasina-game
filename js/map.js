@@ -5,7 +5,7 @@
 //   M = border with Myanmar
 //   C = coastline (Bay of Bengal)
 // MAINLAND is clockwise from the northernmost vertex.
-import { MAINLAND, ISLANDS as RAW_ISLANDS, MYANMAR_OUTLINE } from './data/map-bd.js';
+import { MAINLAND, ISLANDS as RAW_ISLANDS, INDIA_LAND as RAW_INDIA, OTHER_LAND as RAW_OTHER, MYANMAR_OUTLINE } from './data/map-bd.js';
 
 // Equirectangular projection to "map units" (~1 unit ≈ 100 km). y grows downward.
 const COS = Math.cos((24 * Math.PI) / 180);
@@ -16,6 +16,10 @@ export const BD = MAINLAND.map(([lon, lat]) => proj(lon, lat));
 // Projected island rings (Bhola, Hatiya, etc.). Drawing only: not part of
 // BD, so spawns and breaches use the mainland polygon.
 export const ISLANDS = RAW_ISLANDS.map((ring) => ring.map(([lon, lat]) => proj(lon, lat)));
+
+// Projected neighbour land (drawn as background; INDIA also gates spawns).
+export const INDIA = RAW_INDIA.map((ring) => ring.map(([lon, lat]) => proj(lon, lat)));
+export const OTHER_LAND = RAW_OTHER.map((ring) => ring.map(([lon, lat]) => proj(lon, lat)));
 
 export const INDIA_EDGES = [];
 MAINLAND.forEach((v, i) => {
@@ -30,7 +34,9 @@ export const INDIA_LEN = INDIA_EDGES.reduce((s, e) => s + e.len, 0);
 // Myanmar end at Teknaf west to the India end in the delta), then
 // far-away points to the south-west, south and south-east so the polygon
 // covers the bay without overlapping BD. The two share only the coastline
-// itself; the closing edges stay south of BD, so SEA is simple.
+// itself; the closing edges stay south of BD, so SEA is simple. Kept for
+// compatibility; the engine now fills the whole canvas with the sea
+// gradient instead of using this polygon.
 const coast = MAINLAND.filter((v) => v[2] === 'C');
 // MAINLAND is clockwise from the north, so `coast` already runs Myanmar →
 // India; this guards the sea polygon if the data order ever flips.

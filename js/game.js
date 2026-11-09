@@ -1,5 +1,5 @@
 import {
-  BD, SEA, MYANMAR, INDIA_EDGES, INDIA_LEN, DHAKA, LABELS, BBOX, pointInPoly, distToPoly,
+  BD, MYANMAR, INDIA, OTHER_LAND, ISLANDS, INDIA_EDGES, INDIA_LEN, DHAKA, LABELS, BBOX, pointInPoly, distToPoly,
 } from './map.js';
 import {
   CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
@@ -107,9 +107,19 @@ export class Game {
       p.closePath();
       return p;
     };
+    const mkMulti = (rings) => {
+      const p = new Path2D();
+      for (const ring of rings) {
+        ring.forEach(([x, y], i) => (i ? p.lineTo : p.moveTo).call(p, this.sx(x), this.sy(y)));
+        p.closePath();
+      }
+      return p;
+    };
     this.bdPath = mk(BD);
-    this.seaPath = mk(SEA);
+    this.indiaPath = mkMulti(INDIA);
+    this.otherPath = mkMulti(OTHER_LAND);
     this.myPath = mk(MYANMAR);
+    this.islandsPath = mkMulti(ISLANDS);
     this.indiaBorder = new Path2D();
     for (const e of INDIA_EDGES) {
       this.indiaBorder.moveTo(this.sx(e.a[0]), this.sy(e.a[1]));
@@ -207,7 +217,8 @@ export class Game {
       const d = rand(CONFIG.spawn.min, CONFIG.spawn.max);
       const x = clamp(px + nx * d, v.minX + m, v.maxX - m);
       const y = clamp(py + ny * d, v.minY + m, v.maxY - m);
-      if (pointInPoly(BD, x, y) || pointInPoly(SEA, x, y) || pointInPoly(MYANMAR, x, y)) continue;
+      if (pointInPoly(BD, x, y)) continue;
+      if (!INDIA.some((ring) => pointInPoly(ring, x, y))) continue;
       if (distToPoly(BD, x, y) < CONFIG.spawn.minBorderDist) continue;
       return { x, y, tx: px - nx * CONFIG.spawn.targetInset, ty: py - ny * CONFIG.spawn.targetInset };
     }
@@ -600,17 +611,25 @@ export class Game {
     }
     const t = performance.now() / 1000;
 
-    // India (background)
-    ctx.fillStyle = '#2b2633';
-    ctx.fillRect(-20, -20, this.w + 40, this.h + 40);
-    ctx.fillStyle = '#332d3c';
-    ctx.fill(this.myPath);
-    // sea
-    const sea = ctx.createLinearGradient(0, this.sy(BBOX.maxY - 1), 0, this.h);
+    // sea (full-canvas background)
+    const sea = ctx.createLinearGradient(0, 0, 0, this.h);
     sea.addColorStop(0, '#12476b');
     sea.addColorStop(1, '#0a2a44');
     ctx.fillStyle = sea;
-    ctx.fill(this.seaPath);
+    ctx.fillRect(-20, -20, this.w + 40, this.h + 40);
+    // neighbour land. Each country is simplified on its own, so shared borders leave
+    // hairline gaps; stroking every shape in its own colour closes them.
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    for (const [path, color] of [[this.indiaPath, '#2b2633'], [this.otherPath, '#2f2a36'], [this.myPath, '#332d3c']]) {
+      ctx.fillStyle = color; ctx.strokeStyle = color;
+      ctx.fill(path); ctx.stroke(path);
+    }
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 1;
+    ctx.stroke(this.indiaPath);
+    ctx.stroke(this.myPath);
 
     // labels
     ctx.textAlign = 'center';
@@ -623,12 +642,16 @@ export class Game {
     ctx.save();
     ctx.fillStyle = '#0f6a45';
     ctx.fill(this.bdPath);
+    ctx.fill(this.islandsPath);
     ctx.clip(this.bdPath);
     ctx.fillStyle = 'rgba(218,26,52,0.82)';
     ctx.beginPath();
     ctx.arc(this.sx(DHAKA[0] - 0.15), this.sy(DHAKA[1]), this.s * 1.1, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke(this.islandsPath);
 
     // border
     const danger = this.enemies.some((e) => e.near < CONFIG.combat.dangerDistance);

@@ -11,9 +11,10 @@
 //
 // Writes js/data/map-bd.js (generated; do not edit by hand).
 // `--preview <file.svg>` optionally writes an SVG review image (I=green,
-// M=orange, C=blue mainland strokes, islands grey, Myanmar light grey,
-// Dhaka dot). The default tolerance is 0.02 map units (~2 km; see `proj`
-// below, where 1 unit ~ 100 km).
+// M=orange, C=blue mainland strokes, islands grey, India light green,
+// Myanmar light grey, other land tan, Dhaka dot). The default tolerance is
+// 0.02 map units (~2 km; see `proj` below, where 1 unit ~ 100 km) for the
+// BD mainland; neighbour land uses a larger 0.05 tolerance.
 //
 // Features are identified by `properties.ADM0_A3`
 // (`BGD`, `IND`, `MMR`, also `NPL`, `BTN`, `CHN`); all geometries are
@@ -143,6 +144,62 @@ function simplifyClosed(ringLonLat, tol) {
   const kept = douglasPeucker(pts, tol).map((i) => closed[i]);
   const out = stripClosingDuplicate(kept);
   return out.length >= 3 ? out : stripped;
+}
+
+// Sutherland–Hodgman clip of a ring (lon/lat, without duplicate closing
+// point) to the rectangle lon [78, 102], lat [14, 32]. Returns a clipped
+// ring (possibly empty). Each clip edge keeps one half-plane; the
+// intersection of a segment with the clip line is interpolated linearly.
+const CLIP = { minLon: 78, maxLon: 102, minLat: 14, maxLat: 32 };
+
+function clipIntersectVertical(a, b, lon) {
+  if (b[0] === a[0]) return [lon, b[1]];
+  const t = (lon - a[0]) / (b[0] - a[0]);
+  return [lon, a[1] + t * (b[1] - a[1])];
+}
+
+function clipIntersectHorizontal(a, b, lat) {
+  if (b[1] === a[1]) return [b[0], lat];
+  const t = (lat - a[1]) / (b[1] - a[1]);
+  return [a[0] + t * (b[0] - a[0]), lat];
+}
+
+function clipRingToRect(ringLonLat) {
+  let poly = stripClosingDuplicate(ringLonLat);
+  if (poly.length === 0) return [];
+  const edges = [
+    { keep: (p) => p[0] >= CLIP.minLon, intersect: (a, b) => clipIntersectVertical(a, b, CLIP.minLon) },
+    { keep: (p) => p[0] <= CLIP.maxLon, intersect: (a, b) => clipIntersectVertical(a, b, CLIP.maxLon) },
+    { keep: (p) => p[1] >= CLIP.minLat, intersect: (a, b) => clipIntersectHorizontal(a, b, CLIP.minLat) },
+    { keep: (p) => p[1] <= CLIP.maxLat, intersect: (a, b) => clipIntersectHorizontal(a, b, CLIP.maxLat) },
+  ];
+  for (const edge of edges) {
+    if (poly.length === 0) break;
+    const out = [];
+    let prev = poly[poly.length - 1];
+    let prevInside = edge.keep(prev);
+    for (const curr of poly) {
+      const currInside = edge.keep(curr);
+      if (currInside) {
+        if (!prevInside) out.push(edge.intersect(prev, curr));
+        out.push(curr);
+      } else if (prevInside) {
+        out.push(edge.intersect(prev, curr));
+      }
+      prev = curr;
+      prevInside = currInside;
+    }
+    poly = out;
+  }
+  // Drop exact consecutive duplicates introduced where an intersection
+  // coincides with a vertex.
+  const deduped = [];
+  for (const p of poly) {
+    const last = deduped[deduped.length - 1];
+    if (last && last[0] === p[0] && last[1] === p[1]) continue;
+    deduped.push(p);
+  }
+  return stripClosingDuplicate(deduped);
 }
 
 function allSegments(feature) {
@@ -313,18 +370,50 @@ const islands = islandCandidates.map(({ ring }) => simplifyClosed(ring, toleranc
 console.log(`islands: ${islands.length} rings, ${islands.reduce((s, r) => s + r.length, 0)} vertices ` +
   `(from ${bgdOuters.length - 1} other rings, area >= ${MIN_ISLAND_AREA} deg^2)`);
 
-// 6. Myanmar: largest MMR ring, keep lon < 95.5 && lat > 19, then close and simplify.
-const mmrOuters = outerRings(mmr);
-let mmrIdx = 0;
-for (let i = 1; i < mmrOuters.length; i++) if (mmrOuters[i].length > mmrOuters[mmrIdx].length) mmrIdx = i;
-const mmrLargest = stripClosingDuplicate(mmrOuters[mmrIdx].slice());
-const mmrFiltered = mmrLargest.filter(([lon, lat]) => lon < 95.5 && lat > 19);
-if (mmrFiltered.length < 3) {
-  console.error('Myanmar filtered ring has fewer than 3 points');
+// 6. Neighbour land: clip every outer ring to the rect lon [78, 102],
+// lat [14, 32] (Sutherland–Hodgman), simplify with a larger tolerance than
+// the BD mainland (neighbour detail does not affect gameplay), and drop
+// tiny rings. INDIA_LAND feeds spawns; OTHER_LAND is drawing only.
+const NEIGHBOUR_TOL = Math.max(tolerance, 0.05);
+const MIN_NEIGHBOUR_AREA = 0.003; // deg^2, same threshold as islands
+function neighbourRings(feature, label) {
+  const outers = outerRings(feature);
+  let kept = 0;
+  const rings = [];
+  for (const ring of outers) {
+    const clipped = clipRingToRect(ring);
+    if (clipped.length < 3) continue;
+    if (ringAreaDeg2(clipped) < MIN_NEIGHBOUR_AREA) continue;
+    const simp = simplifyClosed(clipped, NEIGHBOUR_TOL);
+    if (simp.length < 3) continue;
+    if (ringAreaDeg2(simp) < MIN_NEIGHBOUR_AREA) continue;
+    rings.push(simp);
+    kept++;
+  }
+  console.log(`${label}: ${outers.length} outer rings -> ${rings.length} kept, ` +
+    `${rings.reduce((s, r) => s + r.length, 0)} vertices (neighbour tol ${NEIGHBOUR_TOL})`);
+  return rings;
+}
+const indiaLand = neighbourRings(ind, 'india');
+const myanmarLand = neighbourRings(mmr, 'myanmar');
+myanmarLand.sort((a, b) => ringAreaDeg2(b) - ringAreaDeg2(a));
+const otherLand = [];
+for (const a3 of ['NPL', 'BTN', 'CHN']) {
+  const f = byA3(a3);
+  if (!f) { console.log(`${a3}: feature not found, skipped`); continue; }
+  otherLand.push(...neighbourRings(f, a3.toLowerCase()));
+}
+if (myanmarLand.length === 0) {
+  console.error('Myanmar clipped land is empty (check MMR feature / clip rect)');
   process.exit(1);
 }
-const myanmar = simplifyOpen(mmrFiltered, tolerance);
-console.log(`myanmar: ${mmrLargest.length} -> filtered ${mmrFiltered.length} -> simplified ${myanmar.length} vertices`);
+if (indiaLand.length === 0) {
+  console.error('India clipped land is empty (check IND feature / clip rect)');
+  process.exit(1);
+}
+// Back-compat: the old outline was the (filtered) Myanmar coastline; now
+// the largest clipped Myanmar ring, which shares the BD–Myanmar border.
+const myanmar = myanmarLand[0];
 
 // 7. Write js/data/map-bd.js.
 const outPath = path.join(__dirname, '..', 'js', 'data', 'map-bd.js');
@@ -342,6 +431,23 @@ for (const ring of islands) {
   lines.push('  [' + ring.map(([lon, lat]) => `[${fmt4(lon)}, ${fmt4(lat)}]`).join(', ') + '],');
 }
 lines.push('];');
+lines.push('// Neighbour land: outer rings clipped to lon [78, 102], lat [14, 32],');
+lines.push('// simplified with a larger neighbour tolerance. Drawing + spawn test only.');
+lines.push('export const INDIA_LAND = [');
+for (const ring of indiaLand) {
+  lines.push('  [' + ring.map(([lon, lat]) => `[${fmt4(lon)}, ${fmt4(lat)}]`).join(', ') + '],');
+}
+lines.push('];');
+lines.push('export const MYANMAR_LAND = [');
+for (const ring of myanmarLand) {
+  lines.push('  [' + ring.map(([lon, lat]) => `[${fmt4(lon)}, ${fmt4(lat)}]`).join(', ') + '],');
+}
+lines.push('];');
+lines.push('export const OTHER_LAND = [');
+for (const ring of otherLand) {
+  lines.push('  [' + ring.map(([lon, lat]) => `[${fmt4(lon)}, ${fmt4(lat)}]`).join(', ') + '],');
+}
+lines.push('];');
 lines.push('export const MYANMAR_OUTLINE = [');
 for (const [lon, lat] of myanmar) lines.push(`  [${fmt4(lon)}, ${fmt4(lat)}],`);
 lines.push('];');
@@ -354,7 +460,9 @@ if (previewPath) {
   const all = [
     ...simplified.map(([lon, lat]) => proj(lon, lat)),
     ...islands.flatMap((r) => r.map(([lon, lat]) => proj(lon, lat))),
-    ...myanmar.map(([lon, lat]) => proj(lon, lat)),
+    ...indiaLand.flatMap((r) => r.map(([lon, lat]) => proj(lon, lat))),
+    ...myanmarLand.flatMap((r) => r.map(([lon, lat]) => proj(lon, lat))),
+    ...otherLand.flatMap((r) => r.map(([lon, lat]) => proj(lon, lat))),
   ];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [x, y] of all) {
@@ -380,19 +488,27 @@ if (previewPath) {
     }).join(' ') + ' Z';
     return `<path d="${d}" fill="none" stroke="#666" stroke-width="0.015"/>`;
   }).join('\n');
-  const myD = myanmar.map(([lon, lat], i) => {
-    const [x, y] = proj(lon, lat);
-    return `${i ? 'L' : 'M'}${x.toFixed(4)},${y.toFixed(4)}`;
-  }).join(' ') + ' Z';
+  const ringPath = (ring, fill, stroke) => {
+    const d = ring.map(([lon, lat], i) => {
+      const [x, y] = proj(lon, lat);
+      return `${i ? 'L' : 'M'}${x.toFixed(4)},${y.toFixed(4)}`;
+    }).join(' ') + ' Z';
+    return `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="0.015"/>`;
+  };
+  const indiaPaths = indiaLand.map((ring) => ringPath(ring, '#d9ead3', '#7aa07a')).join('\n');
+  const otherPaths = otherLand.map((ring) => ringPath(ring, '#e8dcc8', '#a08c5a')).join('\n');
+  const myanmarPaths = myanmarLand.map((ring) => ringPath(ring, '#e5e5e5', '#999')).join('\n');
   const [dx, dy] = proj(90.41, 23.81);
   const svg = `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="${sw}" height="${sh}" viewBox="${(minX - pad).toFixed(4)} ${(minY - pad).toFixed(4)} ${w.toFixed(4)} ${h.toFixed(4)}">\n` +
     `<rect x="${(minX - pad).toFixed(4)}" y="${(minY - pad).toFixed(4)}" width="${w.toFixed(4)}" height="${h.toFixed(4)}" fill="#fff"/>\n` +
-    `<path d="${myD}" fill="#e5e5e5" stroke="#999" stroke-width="0.015"/>\n` +
+    (otherPaths ? otherPaths + '\n' : '') +
+    (indiaPaths ? indiaPaths + '\n' : '') +
+    (myanmarPaths ? myanmarPaths + '\n' : '') +
     islandPaths + '\n' + segs +
     `<circle cx="${dx.toFixed(4)}" cy="${dy.toFixed(4)}" r="0.05" fill="#d73027" stroke="#000" stroke-width="0.01"/>\n` +
     `<text x="${(dx + 0.08).toFixed(4)}" y="${dy.toFixed(4)}" font-size="0.12" fill="#000">Dhaka</text>\n` +
-    `<text x="${(minX - pad + 0.05).toFixed(4)}" y="${(minY - pad + 0.18).toFixed(4)}" font-size="0.14" fill="#000">I=green M=orange C=blue (tol ${tolerance})</text>\n` +
+    `<text x="${(minX - pad + 0.05).toFixed(4)}" y="${(minY - pad + 0.18).toFixed(4)}" font-size="0.14" fill="#000">I=green M=orange C=blue India=light-green Myanmar=grey Other=tan (tol ${tolerance}, neighbour ${NEIGHBOUR_TOL})</text>\n` +
     '</svg>\n';
   fs.mkdirSync(path.dirname(path.resolve(previewPath)), { recursive: true });
   fs.writeFileSync(previewPath, svg);

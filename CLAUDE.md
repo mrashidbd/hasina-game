@@ -54,7 +54,9 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `js/data/sounds.js` | `SOUNDS`: sound id → optional `file` + `synth` fallback + volume |
 | `js/assets.js` | `preloadImages()`, `getSprite(def, pose)` (null → draw emoji) |
 | `js/perks.js` | Between-wave upgrades: `BASE_MODS` (per-run modifiers), `PERKS`, `perkOptions()` |
-| `js/map.js` | Bangladesh outline (lon/lat, edges tagged India/Myanmar/Coast), projection, sea/Myanmar polygons, geometry helpers |
+| `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |
+| `js/data/map-bd.js` | **Generated** map data (Natural Earth 10m). Don't edit; run `tools/build-map.mjs` |
+| `tools/build-map.mjs` | Node script: Natural Earth GeoJSON → `js/data/map-bd.js` (+ optional preview SVG). See `tools/README.md` |
 | `js/i18n.js` | `en` / `bn` strings, `t(key, vars)`, `fmt(n)` (Bangla digits), language detection |
 | `js/audio.js` | `sfx.*` sound effects, mute state |
 | `sw.js` | Service worker; `VERSION` + `ASSETS` list |
@@ -90,7 +92,12 @@ delegated, then Claude reviews diffs in detail, runs tests, fixes small issues i
 sends larger corrections back to the tools.
 - `opencode run -m opencode/crouton-alpha-free --auto "<brief>"` (unlimited; default choice)
 - `agy -p "<brief>" --model claude-opus-4-6-thinking --mode accept-edits`; when its limit
-  is reached use `--model gemini-3.8-flash-high`
+  is reached use `--model gemini-3.8-flash-high`. **Caveat (2026-11-09):** in print mode
+  agy stops at its first permission prompt (even listing a folder), `--mode auto` isn't
+  available on this account, and `--dangerously-skip-permissions` is blocked by Claude's
+  safety rules. So agy currently can't finish file-writing tasks unattended; use opencode
+  unless the user runs agy interactively. Also never let an agent open the 13 MB GeoJSON.
+- Two agents can run in parallel only on disjoint files (say so in each brief).
 - Briefs: precise file list, exact values, "don't" list (no docs edits, no commits, no
   deps), and "done when" checks. Keep briefs in the session scratchpad, not the repo.
 - Current roadmap: `docs/PLAN-v2.md`. Art/sound prompts for the user: `docs/prompts/`.

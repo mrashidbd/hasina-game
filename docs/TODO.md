@@ -19,5 +19,14 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [ ] `spawnPoint()` can return `null` after 40 tries, silently dropping that intruder
       (wave still clears). Unlikely, but worth knowing when tuning spawn constants.
 
+## v2 follow-ups
+- [ ] Real character art is full-body chibi, but `drawEnemy`/`drawFleeing` still clip the
+      sprite into the coloured circle and `drawEnemy` doesn't mirror by walking direction.
+      Needs a full-body sprite renderer when art arrives (plan phase E).
+- [ ] Hero size (64 px) is large next to small intruders on phones; tune `CONFIG.kick.heroSizePx`
+      after real art arrives.
+- [ ] Map: tiny islands such as St Martin's are dropped by the area threshold in
+      `tools/build-map.mjs`; add an explicit keep-list if wanted.
+
 ## Content placeholders (user to decide)
 - [ ] Real names / art for tier 2 and tier 3 characters — roster names given 2026-11-09, wiring in plan phase E (`js/data/enemies.js`, `char.*` in `js/i18n.js`).

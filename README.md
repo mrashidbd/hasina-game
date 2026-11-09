@@ -33,7 +33,8 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 |---|---|
 | `index.html` | Screens (menu, how-to, pause, game over) and the HUD |
 | `css/style.css` | UI styling, responsive, safe-area aware (notches) |
-| `js/map.js` | Simplified outline of Bangladesh (lon/lat) tagged by border type (India / Myanmar / coast), projection, geometry helpers |
+| `js/map.js` | Map shapes (Bangladesh, borders tagged India / Myanmar / coast, neighbours, islands), projection, geometry helpers |
+| `js/data/map-bd.js` / `tools/build-map.mjs` | Generated map data from Natural Earth (public domain) and the script that builds it |
 | `js/config.js` | **All global tunables** (`CONFIG`): waves, spawns, scoring, power-ups, kick… |
 | `js/data/enemies.js` | **Roster and balance**: tiers, penalties, emoji, sprites, HP, speed, points, behaviours; power-ups |
 | `js/data/heroes.js` / `js/data/sounds.js` | Self characters; sound catalogue (files with synth fallback) |
@@ -55,8 +56,9 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
    They don't come from the sea or the Myanmar side. Each spawn is telegraphed by a flashing
    **!** marker 0.7 s before the intruder appears (a gold 👑 for Hasina).
 2. Each one walks to a point on the border and then heads for Dhaka.
-3. The player **taps or clicks** intruders to catch them. Tough ones take several taps, and each
-   hit knocks them back a little.
+3. Before the run the player picks a **hero** (Farmer, Student ♂, Student ♀, Common People).
+   The player **taps or clicks** intruders; the hero pops up and kicks them, and caught
+   intruders run back towards India and fade away. Tough ones take several kicks, and each kick knocks them back a little.
 4. What happens when someone gets in depends on their **tier** (below). Only Hasina ends the game.
 5. When a wave is cleared there's a bonus and a short break, then the next, harder wave starts.
    After every 2nd wave the player first **picks one of three upgrades** (see below).
