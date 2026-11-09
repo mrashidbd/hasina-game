@@ -46,12 +46,12 @@ export const CONFIG = {
     doubleChance: 0.2, // probability, chance of a second spawn in the same tick
     firstSpawnDelay: 1.2, // s, delay before the first spawn of a wave
     breakTime: 2.4, // s, break between waves
-    poolBackboneId: 'small1', // id, backbone character id (fixed pool weight)
-    poolBackboneWeight: 10, // weight, backbone pool weight
-    poolTier3Base: 2, // weight, tier-3 pool weight base (base + perWave·n)
-    poolTier3PerWave: 0.6, // weight per wave, tier-3 pool weight growth
-    poolTier2Base: 1, // weight, tier-2 pool weight base (base + perWave·n)
-    poolTier2PerWave: 0.35, // weight per wave, tier-2 pool weight growth
+    poolBackbone: { nazmul: 4, zakir: 4, momotaz: 2 }, // id -> fixed weight, still subject to unlock
+    poolTier3Base: 1, // weight, tier-3 pool weight base (base + perWave·n)
+    poolTier3PerWave: 0.3, // weight per wave, tier-3 pool weight growth
+    poolTier2Base: 0.8, // weight, tier-2 pool weight base (base + perWave·n)
+    poolTier2PerWave: 0.28, // weight per wave, tier-2 pool weight growth
+    warnThrottle: 0.25, // s, minimum interval between spawn-warning sounds
     mainEvery: 3, // waves, main target every Nth wave
     mainFromWave: 12, // wave, from this wave the main target comes more often
     mainEveryLate: 2, // waves, main target every Nth wave from mainFromWave
@@ -114,5 +114,13 @@ export const CONFIG = {
     fleeWobbleDeg: 12, // deg, fleeing tilt/wobble amplitude
     fleeFade: true, // fade out while fleeing
     sweepAllHeroes: true, // bool, sweep kicks cycle through all heroes
+  },
+  sprites: {
+    heightMul: 2.8, // multiplier, full-body sprite height = rpx(r) × heightMul
+    feetOffset: 0.9, // multiplier, feet sit at y + rpx(r) × feetOffset below the centre
+  },
+  audio: {
+    musicVolume: 0.35, // volume, music track volume
+    sfxVolume: 1, // volume, multiplier on file-playback volume
   },
 };

@@ -64,31 +64,41 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
    After every 2nd wave the player first **picks one of three upgrades** (see below).
 6. While Hasina is on the map, a gold HP bar under the HUD shows how much she has left.
 
-## Character tiers (all names and art are placeholders)
+## Character tiers
 
-Everything is configured in `js/data/enemies.js` (global numbers in `js/config.js`). Names, in English and Bangla, are in `js/i18n.js` under `char`.
+Everything is configured in `js/data/enemies.js` (global numbers in `js/config.js`). Names, in
+English and Bangla, are in `js/i18n.js` under `char`. Art and sound prompts per character are in
+`docs/prompts/`. Until art exists each character is an emoji on a coloured circle.
 
 | Tier | Who | If they get in |
 |---|---|---|
-| **1. Main target** | Hasina only | **Game over.** A 🛡️ shield, if you have one, throws her back to where she started instead |
-| **2. Senior leaders** | 4 placeholder characters | **−200 points** (score never drops below 0) |
-| **3. Small leaders** | 5 placeholder characters | **−50 points** |
+| **1. Main target** | Hasina | **Game over.** A 🛡️ shield, if you have one, throws her back to where she started instead |
+| **2. Senior leaders** | 5 characters | **−200 points** (score never drops below 0) |
+| **3. Small leaders** | 11 characters | **−50 points** |
 
-| ID | Placeholder | Tier | Taps | Points | From wave | Behaviour |
+| ID | Name | Tier | Kicks | Points | From wave | Behaviour |
 |---|---|---|---|---|---|---|
-| `hasina` | 👑 Hasina | 1 | 15 (+5 each time she returns) | 500 | every 3rd wave, every 2nd from wave 12 | Slow, gold aura, calls in small and senior leaders, always drops a power-up |
-| `senior1` | 😤 Senior Leader 1 | 2 | 3 | 50 | 2 | Heavy |
-| `senior2` | 🕴️ Senior Leader 2 | 2 | 2 | 60 | 4 | Jumps sideways when hit |
-| `senior3` | 📢 Senior Leader 3 | 2 | 4 | 80 | 5 | Keeps calling in small leaders |
-| `senior4` | 😎 Senior Leader 4 | 2 | 7 | 120 | 7 | Very tough, very slow |
-| `small1` | 😠 Small Leader 1 | 3 | 1 | 10 | 1 | Basic |
-| `small2` | 🏃 Small Leader 2 | 3 | 1 | 20 | 2 | Fast, zig-zags |
-| `small3` | 🥷 Small Leader 3 | 3 | 1 | 25 | 3 | Fades in and out of view |
-| `small4` | 😬 Small Leader 4 | 3 | 1 | 8 | 4 | Comes in packs of 3 |
-| `small5` | 🤡 Small Leader 5 | 3 | 1 | 15 | 5 | Splits into two Small Leader 1s when tapped (not when swept) |
+| `hasina` | Hasina | 1 | 15 (+5 each time she returns) | 500 | every 3rd wave, every 2nd from wave 12 | Slow, gold aura, calls in helpers, always drops a power-up |
+| `nanok` | Nanok | 2 | 3 | 50 | 2 | Heavy |
+| `taposh` | Taposh | 2 | 2 | 60 | 4 | Jumps sideways when kicked |
+| `quader` | Obaidul Quader | 2 | 4 | 80 | 5 | Keeps calling in small leaders |
+| `arafat` | Arafat | 2 | 2 | 70 | 6 | Flickers in and out of view |
+| `shamim` | Samim Osman | 2 | 7 | 120 | 7 | Very tough, very slow |
+| `nazmul` | Siddique Nazmul | 3 | 1 | 10 | 1 | Basic |
+| `zakir` | Zakir | 3 | 1 | 10 | 1 | Basic |
+| `momotaz` | Momotaz | 3 | 1 | 12 | 2 | Basic |
+| `inan` | Inan | 3 | 1 | 20 | 2 | Fast, zig-zags |
+| `shohag` | Shohag | 3 | 1 | 20 | 3 | Fast, zig-zags |
+| `saddam` | Saddam | 3 | 1 | 8 | 3 | Comes in packs of 3 |
+| `murad` | Murad | 3 | 1 | 22 | 4 | Fastest, zig-zags |
+| `ferdous` | Ferdous | 3 | 1 | 25 | 4 | Fades in and out of view |
+| `mahi` | Mahiya Mahi | 3 | 1 | 25 | 5 | Fades in and out of view |
+| `somrat` | Somrat | 3 | 1 | 15 | 5 | Splits into two basic leaders when kicked (not when swept) |
+| `riyaz` | Riyaz | 3 | 1 | 15 | 6 | Splits into two basic leaders when kicked (not when swept) |
 
-To add more characters to a tier, copy an entry in `CHARACTERS`, give it a new ID, and add
-its name and trait to both languages in `i18n.js`. It joins the wave mix automatically from its `unlock` wave.
+To add a character, copy an entry in `CHARACTERS`, give it a new ID, and add its name and trait
+to both languages in `i18n.js`. It joins the wave mix from its `unlock` wave and automatically
+gets art/sound slots (`assets/enemies/<id>/…`, `assets/sfx/enemies/<id>.mp3`).
 
 ## Point system
 
@@ -111,7 +121,7 @@ and how many points that cost.
 - Intruders per wave: `5 + 1.8 × wave`
 - Spawn interval: `1.5 s × 0.92^(wave−1)`, minimum 0.3 s. From wave 6 there's a 20% chance of a double spawn.
 - Speed multiplier: `1 + 0.07 × (wave−1)`, capped at ×2.1
-- Wave mix: Small Leader 1 is the backbone (weight 10). Other small leaders have weight `2 + 0.6 × wave`, senior leaders `1 + 0.35 × wave`.
+- Wave mix: the basic leaders are the backbone (fixed weights: Nazmul 4, Zakir 4, Momotaz 2). Every other small leader has weight `1 + 0.3 × wave`, every senior leader `0.8 + 0.28 × wave` (`CONFIG.waves`).
 - Hasina appears every 3rd wave (every 2nd from wave 12) with 5 more HP each time.
 
 ## Power-ups
@@ -150,11 +160,18 @@ everyone on screen at once. Hasina only takes 4 damage.
 - The game pauses automatically when the app goes to the background.
 
 ## Swapping in real characters
-Art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using the
-names listed there, then set the paths in `js/data/enemies.js` / `js/data/heroes.js`
-(`sprites.walk`, `sprites.kicked`, …) and `js/data/sounds.js` (`file`). Until a file is set,
-the game draws the emoji and plays the built-in synth sound. Names live in `js/i18n.js`
-(`char.*`, `hero.*`). The service worker caches assets automatically after first load.
+Art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using exactly
+the names listed there (see `assets/README.md`), then run:
+
+```bash
+node tools/build-assets.mjs
+```
+
+It updates `js/data/asset-manifest.js` (the game only loads files listed there, so missing files
+never cause errors) and prints which files are still missing. Art is drawn full-body, facing
+the way the character walks. Until a file exists the game draws the emoji and plays the
+built-in synth sound. Names live in `js/i18n.js` (`char.*`, `hero.*`). The service worker caches
+assets automatically after first load.
 
 ## Roadmap / ideas
 - [ ] Real names and art for the tier 2 and tier 3 characters

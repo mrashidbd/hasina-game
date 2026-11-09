@@ -2,7 +2,7 @@ import { Game } from './game.js';
 import { CHARACTERS, POWERUPS, TIERS } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
 import { PERKS } from './perks.js';
-import { unlockAudio, isMuted, setMuted } from './audio.js';
+import { unlockAudio, isMuted, setMuted, play as playSound, playMusic, stopMusic } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
 import { preloadImages, getSprite } from './assets.js';
 
@@ -18,7 +18,15 @@ function show(id) {
   const playing = id === null;
   $('hud').classList.toggle('hidden', !playing && id !== 'pause' && id !== 'perk');
   $('sweepBtn').classList.toggle('hidden', !playing);
+  if (id === 'over') stopMusic();
+  else if (id === null) playMusic('game');
+  else if (id === 'menu' || id === 'howto' || id === 'heroSelect') playMusic('menu');
 }
+
+// One delegated listener for menu button clicks (tap sound).
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.panel button')) playSound('tap');
+});
 
 // ----- HUD
 const hud = { score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
@@ -35,6 +43,9 @@ function onHud(g) {
   const pct = `${g.sweep}%`;
   if (lastHud.sweep !== pct) { lastHud.sweep = pct; hud.sweepFill.style.width = pct; }
   hud.sweepBtn.classList.toggle('ready', g.sweep >= 100);
+  if (g.mode === 'playing') {
+    playMusic(g.enemies.some((e) => e.def.tier === 1) ? 'boss' : 'game');
+  }
 }
 
 let bannerTimer;
@@ -59,6 +70,7 @@ function saveBest(score, wave) {
 
 function onGameOver(s) {
   const [isRecord, best] = saveBest(s.score, s.wave);
+  if (isRecord) playSound('record');
   $('overScore').textContent = fmt(s.score);
   $('overRecord').classList.toggle('hidden', !isRecord);
   lastResult = s;
@@ -212,10 +224,14 @@ function applyLang() {
   $('rules').innerHTML = t('rules').map((li) => `<li>${li}</li>`).join('');
   $('roster').innerHTML = [1, 2, 3].map((tier) => {
     const note = TIERS[tier].gameOver ? t('tier1Note') : t('tierPenalty', { n: TIERS[tier].penalty });
-    const rows = Object.entries(CHARACTERS).filter(([, c]) => c.tier === tier).map(([k, c]) => `
-      <div class="row"><span class="face" style="background:${c.color}">${c.emoji}</span>
+    const rows = Object.entries(CHARACTERS).filter(([, c]) => c.tier === tier).map(([k, c]) => {
+      const spr = getSprite(c, 'idle'); // falls back to the walk pose
+      const face = spr ? `<img src="${spr.src}" alt="">` : c.emoji;
+      const style = spr ? '' : ` style="background:${c.color}"`;
+      return `<div class="row"><span class="face"${style}>${face}</span>
       <span class="nm">${t(`char.${k}`)}<small>${t(`trait.${k}`)} · ${c.hp > 1 ? t('taps', { n: `${fmt(c.hp)}+` }) : t('tap1')}${c.unlock ? ` · ${t('fromWave', { n: c.unlock })}` : ''}</small></span>
-      <b>${fmt(c.points)} <small>${t('pts')}</small></b></div>`).join('');
+      <b>${fmt(c.points)} <small>${t('pts')}</small></b></div>`;
+    }).join('');
     return `<div class="tier t${tier}"><div class="tierHead"><span>${t(`tier${tier}`)}</span><em>${note}</em></div>${rows}</div>`;
   }).join('');
   $('powers').innerHTML = Object.entries(POWERUPS).map(([k, p]) => `
@@ -229,7 +245,12 @@ function applyLang() {
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
 
-preloadImages();
+// Re-render sprite-based HTML once art has loaded (batched to one frame).
+let artRefresh = 0;
+preloadImages(() => {
+  cancelAnimationFrame(artRefresh);
+  artRefresh = requestAnimationFrame(() => applyLang());
+});
 applyLang();
 show('menu');
 

@@ -52,7 +52,10 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `js/data/enemies.js` | **Roster + per-character balance**: `TIERS`, `CHARACTERS` (stats, behaviours, `sprites`, `sound`), `POWERUPS`, `MAIN_ID`, `isMainWave` |
 | `js/data/heroes.js` | `HEROES`: the 4 self characters (sprites/sound; gameplay use comes in plan phase D) |
 | `js/data/sounds.js` | `SOUNDS`: sound id → optional `file` + `synth` fallback + volume |
-| `js/assets.js` | `preloadImages()`, `getSprite(def, pose)` (null → draw emoji) |
+| `js/assets.js` | `preloadImages(onLoad)`, `getSprite(def, pose)` (null → draw emoji); only loads manifest files |
+| `js/data/asset-manifest.js` | **Generated** list of art/sound files present in `assets/` + `spritePaths()`. Run `node tools/build-assets.mjs` after adding files |
+| `assets/` | Art (`enemies/<id>/`, `heroes/<id>/`), sounds (`sfx/enemies|heroes|game/`), music. Layout in `assets/README.md`, prompts in `docs/prompts/` |
+| `tools/build-assets.mjs` | Scans `assets/`, writes the manifest, reports missing files per character |
 | `js/perks.js` | Between-wave upgrades: `BASE_MODS` (per-run modifiers), `PERKS`, `perkOptions()` |
 | `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |
 | `js/data/map-bd.js` | **Generated** map data (Natural Earth 10m). Don't edit; run `tools/build-map.mjs` |
@@ -74,16 +77,19 @@ Application → "Update on reload", otherwise you may see the cached old version
 4. **New character** = add entry in `CHARACTERS` + `char.<id>` and `trait.<id>` in both
    languages. The how-to roster table and wave mix pick it up automatically.
    **New perk** = entry in `PERKS` + `perkName.<id>` / `perkDesc.<id>` in both languages.
-5. **Assets**: set the path in data (`sprites.<pose>` in `js/data/*.js`, `file` in
-   `js/data/sounds.js`). Null/missing files fall back to emoji / synth, never throw.
-   Art goes in `assets/enemies/<id>/`, `assets/heroes/<id>/`, sounds in `assets/sfx/…`
-   (names per `docs/prompts/`). The SW caches them at runtime; new **JS** files must be
+5. **Assets**: paths are by convention (`assets/enemies/<id>/<pose>.png`,
+   `assets/sfx/enemies/<id>.mp3`, …; see `docs/prompts/`). Drop files in, then run
+   `node tools/build-assets.mjs`; only manifest-listed files are requested, everything else
+   falls back to emoji / synth. The SW caches assets at runtime; new **JS** files must be
    added to `ASSETS` in `sw.js`.
-6. **Any shipped change → bump `VERSION` in `sw.js`** (e.g. `kto-v3` → `kto-v4`), or
+6. **Test in a real browser module context.** `node --check` treats `.js` as a script and
+   misses module errors (e.g. a duplicate import binding broke the whole page once). Use
+   `node --input-type=module --check < file.js` and a headless-Chromium smoke test.
+7. **Any shipped change → bump `VERSION` in `sw.js`** (e.g. `kto-v3` → `kto-v4`), or
    installed players keep the old cached build.
-7. Keep README's rule/point tables in sync with the code when balance changes
+8. Keep README's rule/point tables in sync with the code when balance changes
    (README is what players/maintainers read; it currently matches the code).
-8. Style: 2-space indent, single quotes, semicolons, small focused functions, short
+9. Style: 2-space indent, single quotes, semicolons, small focused functions, short
    comments explaining *why*.
 
 ## Team workflow (since 2026-11-09)

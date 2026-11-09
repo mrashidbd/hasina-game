@@ -20,13 +20,13 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
       (wave still clears). Unlikely, but worth knowing when tuning spawn constants.
 
 ## v2 follow-ups
-- [ ] Real character art is full-body chibi, but `drawEnemy`/`drawFleeing` still clip the
-      sprite into the coloured circle and `drawEnemy` doesn't mirror by walking direction.
-      Needs a full-body sprite renderer when art arrives (plan phase E).
+- [ ] Full-body sprite sizing (`CONFIG.sprites.heightMul/feetOffset`) was only tested with a
+      stand-in image; tune once real art exists.
+- [ ] Music keeps playing on the pause / upgrade screens (only game over stops it).
 - [ ] Hero size (64 px) is large next to small intruders on phones; tune `CONFIG.kick.heroSizePx`
       after real art arrives.
 - [ ] Map: tiny islands such as St Martin's are dropped by the area threshold in
       `tools/build-map.mjs`; add an explicit keep-list if wanted.
 
 ## Content placeholders (user to decide)
-- [ ] Real names / art for tier 2 and tier 3 characters — roster names given 2026-11-09, wiring in plan phase E (`js/data/enemies.js`, `char.*` in `js/i18n.js`).
+- [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).

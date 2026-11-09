@@ -69,6 +69,7 @@ export class Game {
     this.waveStats = { taps: 0, hits: 0, leaks: 0 };
     this.mainCount = 0;
     this.leakFlash = 0;
+    this.lastWarnSound = -1;
   }
 
   // ---------------------------------------------------------------- layout
@@ -147,11 +148,12 @@ export class Game {
     const n = this.wave;
     this.waveStats = { taps: 0, hits: 0, leaks: 0 };
     const count = CONFIG.waves.countBase + Math.floor(n * CONFIG.waves.countPerWave);
-    // Weighting: the basic small leader is the backbone; other small leaders grow
-    // with the wave number, senior leaders grow more slowly.
+    // Weighting: the backbone small leaders have fixed weights; other small
+    // leaders and senior leaders grow with the wave number.
+    const w = CONFIG.waves;
     const pool = Object.entries(CHARACTERS)
-      .filter(([, c]) => c.tier > 1 && n >= c.unlock)
-      .map(([k, c]) => [k, k === CONFIG.waves.poolBackboneId ? CONFIG.waves.poolBackboneWeight : c.tier === 3 ? CONFIG.waves.poolTier3Base + n * CONFIG.waves.poolTier3PerWave : CONFIG.waves.poolTier2Base + n * CONFIG.waves.poolTier2PerWave]);
+      .filter(([, c]) => c.tier > 1 && n >= (c.unlock ?? 1))
+      .map(([k, c]) => [k, w.poolBackbone[k] ?? (c.tier === 3 ? w.poolTier3Base + n * w.poolTier3PerWave : w.poolTier2Base + n * w.poolTier2PerWave)]);
     const q = [];
     for (let i = 0; i < count; i++) q.push(weighted(pool));
     const main = isMainWave(n);
@@ -173,6 +175,7 @@ export class Game {
     if (!this.waveStats.leaks) { bonus += CONFIG.scoring.sealedPerWave * n; sub += ` · ${tr('noLeaks', { n: CONFIG.scoring.sealedPerWave * n })}`; }
     this.score += bonus;
     this.hooks.onBanner?.(tr('cleared', { n }), sub);
+    sfx.cleared();
     this.breakT = CONFIG.waves.breakTime;
   }
 
@@ -188,7 +191,7 @@ export class Game {
     if (this.mode !== 'perk' || !PERKS[id]) return;
     PERKS[id].apply(this);
     this.perks[id] = (this.perks[id] || 0) + 1;
-    sfx.power();
+    sfx.perk();
     this.mode = 'playing';
     this.last = performance.now();
     this.nextWave();
@@ -228,7 +231,13 @@ export class Game {
   /** Pick a spawn point now and show a warning there; the intruder appears later. */
   warn(type) {
     const p = this.spawnPoint();
-    if (p) this.warnings.push({ type, p, t: CONFIG.spawn.warnTime });
+    if (!p) return;
+    this.warnings.push({ type, p, t: CONFIG.spawn.warnTime });
+    // Rate-limited spawn-warning sound (at most one per warnThrottle seconds).
+    if (this.time - this.lastWarnSound >= CONFIG.waves.warnThrottle) {
+      this.lastWarnSound = this.time;
+      sfx.warn();
+    }
   }
 
   /**
@@ -249,7 +258,7 @@ export class Game {
       hp: def.hp, maxHp: def.hp, r: def.radius,
       speed: def.speed * this.speedMul * fair * rand(CONFIG.spawn.speedJitterMin, CONFIG.spawn.speedJitterMax),
       t: 0, seed: Math.random() * 10, hitFlash: 0, hop: 0, summonT: def.summons?.every ?? 0,
-      home: { x: p.x, y: p.y },
+      home: { x: p.x, y: p.y }, facing: 1,
     };
     if (def.tier === 1) {
       e.hp = e.maxHp = def.hp + this.mainCount * CONFIG.waves.mainHpPerAppearance; // tougher every appearance
@@ -331,6 +340,7 @@ export class Game {
     this.spawnKick(e, heroId, viaSweep);
     this.enemies.splice(this.enemies.indexOf(e), 1);
     this.spawnFleeing(e);
+    const oldMult = this.multiplier();
     if (this.time - this.lastCatch < this.mods.comboWindow) this.combo++; else this.combo = 1;
     this.lastCatch = this.time;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
@@ -338,7 +348,8 @@ export class Game {
     let pts = viaSweep ? Math.round(e.def.points * CONFIG.scoring.sweepPointsFactor) : e.def.points * mult;
     const near = distToPoly(BD, e.x, e.y);
     let label = `+${fmt(pts)}`;
-    if (!viaSweep && near < CONFIG.scoring.closeCallDistance) {
+    const closeCall = !viaSweep && near < CONFIG.scoring.closeCallDistance;
+    if (closeCall) {
       pts += CONFIG.scoring.closeCallBonus; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
     }
     const isMain = e.def.tier === 1;
@@ -349,7 +360,10 @@ export class Game {
     this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
     this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
     // A sweep plays one big sound instead of one reaction per intruder.
-    if (!viaSweep) { if (e.def.sound) play(e.def.sound); else play('catch', this.combo); }
+    // The combo is passed through so the synth fallback keeps its pitch.
+    if (!viaSweep) { if (e.def.sound) play(e.def.sound, this.combo); else play('catch', this.combo); }
+    if (!viaSweep && mult > oldMult) sfx.combo();
+    if (closeCall) sfx.close();
     if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
     if (!viaSweep && Math.random() < (isMain ? 1 : CONFIG.powerups.dropChance + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
     if (e.def.splits && !viaSweep) this.split(e);
@@ -358,6 +372,7 @@ export class Game {
   /** Splitters break into smaller intruders, pushed back a little from the border. */
   split(e) {
     const { into, n } = e.def.splits;
+    const kinds = Array.isArray(into) ? into : [into];
     const dx = e.x - e.tx, dy = e.y - e.ty;
     const d = Math.hypot(dx, dy) || 1;
     for (let i = 0; i < n; i++) {
@@ -365,7 +380,7 @@ export class Game {
       const x = e.x + (dx / d) * CONFIG.combat.splitterPush + (-dy / d) * side;
       const y = e.y + (dy / d) * CONFIG.combat.splitterPush + (dx / d) * side;
       if (pointInPoly(BD, x, y)) continue;
-      this.spawn(into, { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side });
+      this.spawn(kinds[Math.floor(Math.random() * kinds.length)], { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side });
     }
   }
 
@@ -438,7 +453,10 @@ export class Game {
     if (pu.kind === 'charge') this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + CONFIG.powerups.chargeAmount);
     this.floater(this.sx(pu.x), this.sy(pu.y) - 24, tr(`pu.${pu.kind}`), def.color, 1.2);
     this.burst(pu.x, pu.y, def.color, 16);
-    sfx.power();
+    if (pu.kind === 'freeze') sfx.freeze();
+    else if (pu.kind === 'wall') sfx.wall();
+    else if (pu.kind === 'shield') sfx.shield();
+    else sfx.power();
   }
 
   breach(e) {
@@ -562,6 +580,7 @@ export class Game {
         vx += (-dy / d) * w; vy += (dx / d) * w;
       }
       e.x += vx * dt; e.y += vy * dt;
+      if (Math.abs(vx) > 0.01) e.facing = vx < 0 ? -1 : 1;
       e.near = distToPoly(BD, e.x, e.y);
       if (e.def.summons) {
         e.summonT -= dt;
@@ -834,25 +853,54 @@ export class Game {
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(x, y + r * 0.9, r * 0.8, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-    // body
     const bob = Math.sin(e.t * 10 + e.seed) * (this.freezeT > 0 ? 0 : 2);
+    const frozen = this.freezeT > 0;
+    // Frozen uses the idle pose (getSprite falls back to walk).
+    const sprite = getSprite(e.def, frozen ? 'idle' : 'walk');
+
+    if (sprite) {
+      // Full-body, feet-anchored, no coloured circle. Art faces right.
+      const S = CONFIG.sprites;
+      const h = r * S.heightMul;
+      const feetY = y + bob + r * S.feetOffset;
+      ctx.save();
+      ctx.translate(x, feetY);
+      if ((e.facing ?? 1) < 0) ctx.scale(-1, 1);
+      if (e.hitFlash > 0 && 'filter' in ctx) ctx.filter = 'brightness(2.2)';
+      ctx.drawImage(sprite, -h / 2, -h, h, h);
+      if ('filter' in ctx) ctx.filter = 'none';
+      ctx.restore();
+      if (frozen) {
+        ctx.fillStyle = 'rgba(160,230,255,0.45)';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      // HP bar above the sprite top.
+      if (e.maxHp > 1) {
+        const bw = r * 2, bh = 5;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(x - bw / 2, feetY - h - 11, bw, bh);
+        ctx.fillStyle = e.hp / e.maxHp > 0.4 ? '#7cffb2' : '#ff5a5a';
+        ctx.fillRect(x - bw / 2, feetY - h - 11, bw * (e.hp / e.maxHp), bh);
+      }
+      // Name tag below the feet.
+      if (e.def.tier <= 2) {
+        ctx.font = `700 ${Math.max(9, r * 0.45)}px system-ui, sans-serif`;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, feetY + 10);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // No sprite: coloured circle + emoji, exactly as before.
     ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.def.color;
     ctx.beginPath(); ctx.arc(x, y + bob, r, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.stroke();
-
-    const sprite = getSprite(e.def, 'walk');
-    if (sprite) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(x, y + bob, r - 2, 0, Math.PI * 2); ctx.clip();
-      ctx.drawImage(sprite, x - r, y + bob - r, r * 2, r * 2);
-      ctx.restore();
-    } else {
-      ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
-      ctx.fillText(e.def.emoji, x, y + bob + r * 0.06);
-    }
-    if (this.freezeT > 0) {
+    ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
+    ctx.fillText(e.def.emoji, x, y + bob + r * 0.06);
+    if (frozen) {
       ctx.fillStyle = 'rgba(160,230,255,0.45)';
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
@@ -958,17 +1006,17 @@ export class Game {
     ctx.translate(f.x, f.y - hop);
     ctx.rotate(tilt);
     if (f.vx < 0) ctx.scale(-1, 1); // mirrored when moving left
-    ctx.fillStyle = def.color;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.stroke();
     if (sprite) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(0, 0, r - 2, 0, Math.PI * 2); ctx.clip();
-      ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
-      ctx.restore();
+      // Full-body, feet-anchored, no coloured circle (kicked pose).
+      const S = CONFIG.sprites;
+      const h = r * S.heightMul;
+      ctx.drawImage(sprite, -h / 2, r * S.feetOffset - h, h, h);
     } else {
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.stroke();
       ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
       ctx.fillText(def.emoji, 0, 0);
     }

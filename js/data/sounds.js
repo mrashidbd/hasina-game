@@ -1,14 +1,32 @@
-// Sound catalogue: a `file` (optional) or a `synth` fallback name in js/audio.js.
-export const SOUNDS = {
-  hit: { file: null, synth: 'hit', volume: 1 },
-  catch: { file: null, synth: 'catch', volume: 1 },
-  miss: { file: null, synth: 'miss', volume: 1 },
-  power: { file: null, synth: 'power', volume: 1 },
-  wave: { file: null, synth: 'wave', volume: 1 },
-  boss: { file: null, synth: 'boss', volume: 1 },
-  sweep: { file: null, synth: 'sweep', volume: 1 },
-  leak: { file: null, synth: 'leak', volume: 1 },
-  shield: { file: null, synth: 'shield', volume: 1 },
-  over: { file: null, synth: 'over', volume: 1 },
-  kick: { file: null, synth: 'kick', volume: 1 },
+// Sound catalogue: a `file` (optional, from the asset manifest) plus a
+// `synth` fallback name in js/audio.js. File names follow
+// docs/prompts/sound-design.md conventions.
+import { CHARACTERS } from './enemies.js';
+import { HEROES } from './heroes.js';
+
+// Derived from the rosters so a new character automatically gets a sound slot.
+const ENEMY_IDS = Object.keys(CHARACTERS);
+const HERO_IDS = Object.keys(HEROES);
+// Game sounds (sound-design.md §3) and the closest existing synth fallback.
+const GAME_SYNTH = {
+  hit: 'hit', miss: 'miss', catch: 'catch', combo: 'catch', close: 'power',
+  power: 'power', freeze: 'power', wall: 'power', shield: 'shield',
+  sweep: 'sweep', wave: 'wave', cleared: 'wave', warn: 'warn',
+  boss: 'boss', leak: 'leak', perk: 'power', over: 'over',
+  record: 'wave', tap: 'tap',
 };
+
+const entry = (file, synth) => ({ file, synth, volume: 1 });
+
+export const SOUNDS = {};
+for (const id of ENEMY_IDS) {
+  SOUNDS[`enemy_${id}`] = entry(`assets/sfx/enemies/${id}.mp3`, id === 'hasina' ? 'boss' : 'catch');
+}
+for (const id of HERO_IDS) {
+  SOUNDS[`hero_${id}`] = entry(`assets/sfx/heroes/${id}.mp3`, 'kick');
+}
+for (const [name, synth] of Object.entries(GAME_SYNTH)) {
+  SOUNDS[name] = entry(`assets/sfx/game/${name}.mp3`, synth);
+}
+// Legacy hero-impact fallback (`play(HEROES[hero].sound || 'kick')`).
+SOUNDS.kick = { file: null, synth: 'kick', volume: 1 };

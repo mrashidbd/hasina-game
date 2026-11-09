@@ -1,15 +1,17 @@
-// Hero roster for a later phase. Not used by gameplay yet.
+// Hero roster. Names match the art/sound file names (see docs/prompts/).
+import { spritePaths } from './asset-manifest.js';
+
 export const HEROES = {
   farmer: {
-    emoji: '👨‍🌾', color: '#7a9e43', sprites: { ready: null, kick: null }, sound: null,
+    emoji: '👨‍🌾', color: '#7a9e43', sprites: spritePaths('heroes', 'farmer', ['ready', 'kick', 'cheer']), sound: 'hero_farmer',
   },
   studentM: {
-    emoji: '👨‍🎓', color: '#4a6fa5', sprites: { ready: null, kick: null }, sound: null,
+    emoji: '👨‍🎓', color: '#4a6fa5', sprites: spritePaths('heroes', 'studentM', ['ready', 'kick', 'cheer']), sound: 'hero_studentM',
   },
   studentF: {
-    emoji: '👩‍🎓', color: '#b565a7', sprites: { ready: null, kick: null }, sound: null,
+    emoji: '👩‍🎓', color: '#b565a7', sprites: spritePaths('heroes', 'studentF', ['ready', 'kick', 'cheer']), sound: 'hero_studentF',
   },
   common: {
-    emoji: '🧑', color: '#c9a227', sprites: { ready: null, kick: null }, sound: null,
+    emoji: '🧑', color: '#c9a227', sprites: spritePaths('heroes', 'common', ['ready', 'kick', 'cheer']), sound: 'hero_common',
   },
 };

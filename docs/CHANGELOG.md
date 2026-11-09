@@ -3,6 +3,20 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-09 — v2 phase E: real roster (branch `v2`)
+- 17 real characters replace the placeholders (Hasina; Quader, Nanok, Taposh, Samim Osman,
+  Arafat; Siddique Nazmul, Zakir, Momotaz, Inan, Shohag, Saddam, Murad, Ferdous, Mahiya Mahi,
+  Somrat, Riyaz) with behaviours, names and traits in both languages. Wave weights rescaled so
+  the tier-2 share matches the old balance.
+- Asset pipeline: conventional paths + generated `js/data/asset-manifest.js`
+  (`tools/build-assets.mjs`); only existing files are requested.
+- Full-body sprite rendering (feet-anchored, mirrored by walking direction); all sounds of the
+  sound-design doc wired with synth fallbacks; menu/game/boss music support.
+- Review fixes by Claude: duplicate `play` import broke the page (rename to `playSound`);
+  sound list derived from the rosters; how-to roster re-renders when art loads; sound files
+  no longer fetched twice. Tested with stand-in art + a generated sound file (removed again).
+  SW `kto-v8`.
+
 ## 2026-11-09 — v2 phases C + D (branch `v2`)
 - **Accurate map** (opencode, 2 rounds, reviewed): `tools/build-map.mjs` turns Natural Earth
   10m data into `js/data/map-bd.js`: 340-point mainland with I/M/C edge tags, 15 islands,

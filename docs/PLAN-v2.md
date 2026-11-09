@@ -63,7 +63,7 @@ Written by Claude (needs judgment on tone and likeness), reviewed by the user.
   can't be tapped and can't breach. Scoring/combo happen at the kick, as today.
 - Sweep: all four heroes appear and kick everyone at once.
 
-### E. New roster in game — delegate
+### E. New roster in game — delegate ✅ done 2026-11-09 (opencode, reviewed)
 - 17 characters mapped onto existing behaviours (heavy, dodge, summon, tank, runner,
   stealth, pack, splitter…) with names in both languages; unlock schedule rebalanced
   for 5 tier-2 and 11 tier-3 characters. Exact mapping listed in the enemy prompt doc.
