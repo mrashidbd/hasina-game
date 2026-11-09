@@ -10,4 +10,5 @@ export const SOUNDS = {
   leak: { file: null, synth: 'leak', volume: 1 },
   shield: { file: null, synth: 'shield', volume: 1 },
   over: { file: null, synth: 'over', volume: 1 },
+  kick: { file: null, synth: 'kick', volume: 1 },
 };

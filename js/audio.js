@@ -36,6 +36,27 @@ function tone(freq, dur, { type = 'sine', vol = 0.12, slide = 0, delay = 0 } = {
   osc.stop(t0 + dur + 0.02);
 }
 
+function noise(dur, vol = 0.1, delay = 0) {
+  if (muted || !ctx) return;
+  const t0 = ctx.currentTime + delay;
+  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.setValueAtTime(1200, t0);
+  f.frequency.exponentialRampToValueAtTime(300, t0 + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start(t0);
+  src.stop(t0 + dur);
+}
+
 const SYNTH = {
   hit: () => tone(320, 0.08, { type: 'square', vol: 0.06, slide: -120 }),
   catch: (combo = 1) => tone(440 + Math.min(combo, 20) * 30, 0.12, { type: 'triangle', vol: 0.12, slide: 200 }),
@@ -47,6 +68,7 @@ const SYNTH = {
   leak: () => tone(220, 0.25, { type: 'sawtooth', vol: 0.08, slide: -140 }),
   shield: () => tone(300, 0.3, { type: 'square', vol: 0.1, slide: -200 }),
   over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', vol: 0.09, delay: i * 0.18 })),
+  kick: () => { noise(0.13, 0.12); tone(150, 0.16, { type: 'sine', vol: 0.2, slide: -90, delay: 0.03 }); },
 };
 
 /** Fetch and decode every non-null sound file. No-ops until the AudioContext exists. */
@@ -96,4 +118,5 @@ export const sfx = {
   leak: () => play('leak'),
   shield: () => play('shield'),
   over: () => play('over'),
+  kick: () => play('kick'),
 };

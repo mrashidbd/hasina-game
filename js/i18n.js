@@ -14,6 +14,7 @@ const STRINGS = {
     howTitle: 'How to play',
     rules: [
       '<b>Tap / click</b> intruders to catch them and send them back.',
+      '<b>Tap</b> an intruder and <b>your hero</b> kicks them back towards India.',
       'If <b>Hasina</b> crosses the border, it\'s <b>game over</b> (unless you have a 🛡️ shield, which throws her back).',
       'If a <b>senior leader</b> gets in you lose <b>200</b> points; a <b>small leader</b> costs <b>50</b>. The game goes on.',
       'Hasina comes every 3rd wave (every 2nd from wave 12), gets tougher each time, and keeps calling in helpers.',
@@ -63,6 +64,12 @@ const STRINGS = {
     hero: {
       farmer: 'Farmer', studentM: 'Student', studentF: 'Student', common: 'Common People',
     },
+    heroTitle: 'Choose your champion',
+    heroDesc: {
+      farmer: 'Hard work, harder kicks', studentM: 'Quick feet, fearless heart',
+      studentF: 'Sharp mind, sharper kick', common: 'The people’s champion',
+    },
+    start: '▶ Start',
     perkTitle: 'Choose an upgrade',
     perkSub: 'Wave {n} cleared. Pick one, it lasts for the rest of the run.',
     perkName: {
@@ -97,6 +104,7 @@ const STRINGS = {
     howTitle: 'কীভাবে খেলবে',
     rules: [
       'অনুপ্রবেশকারীদের <b>ট্যাপ / ক্লিক</b> করে ধরো এবং ফেরত পাঠাও।',
+      'অনুপ্রবেশকারীকে <b>ট্যাপ করলে</b> <b>তোমার নায়ক</b> লাথি মেরে ভারতের দিকে পাঠায়।',
       '<b>হাসিনা</b> সীমান্ত পেরোলেই <b>খেলা শেষ</b> (যদি না তোমার 🛡️ শিল্ড থাকে, যা তাকে পেছনে ছুড়ে দেয়)।',
       '<b>সিনিয়র নেতা</b> ঢুকলে <b>২০০</b> পয়েন্ট কাটা যাবে; <b>ছোট নেতা</b> ঢুকলে <b>৫০</b>। খেলা চলতে থাকবে।',
       'হাসিনা প্রতি ৩য় ওয়েভে আসে (ওয়েভ ১২ থেকে প্রতি ২য়), প্রতিবার আরও শক্ত হয় এবং সাহায্যকারী ডাকে।',
@@ -145,6 +153,12 @@ const STRINGS = {
     hero: {
       farmer: 'কৃষক', studentM: 'ছাত্র', studentF: 'ছাত্রী', common: 'সাধারণ মানুষ',
     },
+    heroTitle: 'তোমার নায়ক বেছে নাও',
+    heroDesc: {
+      farmer: 'পরিশ্রমী হাত, কঠোর লাথি', studentM: 'দ্রুত পা, নির্ভীক মন',
+      studentF: 'তীক্ষ্ণ বুদ্ধি, আরও তীক্ষ্ণ লাথি', common: 'জনগণের চ্যাম্পিয়ন',
+    },
+    start: '▶ শুরু করো',
     perkTitle: 'একটি আপগ্রেড বেছে নাও',
     perkSub: 'ওয়েভ {n} শেষ। একটি বেছে নাও, পুরো খেলায় থাকবে।',
     perkName: {

@@ -1,9 +1,10 @@
 import { Game } from './game.js';
 import { CHARACTERS, POWERUPS, TIERS } from './data/enemies.js';
+import { HEROES } from './data/heroes.js';
 import { PERKS } from './perks.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
-import { preloadImages } from './assets.js';
+import { preloadImages, getSprite } from './assets.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -11,7 +12,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
 
-const screens = ['menu', 'howto', 'pause', 'perk', 'over'];
+const screens = ['menu', 'heroSelect', 'howto', 'pause', 'perk', 'over'];
 function show(id) {
   for (const s of screens) $(s).classList.toggle('hidden', s !== id);
   const playing = id === null;
@@ -115,15 +116,47 @@ function updateBest() {
   $('bestLine').textContent = best.score ? t('best', { score: best.score, wave: best.wave }) : t('noBest');
 }
 
-function play() {
+function play(heroId = selectedHero) {
   unlockAudio();
+  store.set('kto-hero', heroId);
   show(null);
-  game.start();
+  game.start(heroId);
 }
 
+let selectedHero = store.get('kto-hero', 'farmer');
+if (!HEROES[selectedHero]) selectedHero = Object.keys(HEROES)[0];
+
+function renderHeroes() {
+  $('heroGrid').innerHTML = Object.entries(HEROES).map(([id, def]) => {
+    const spr = getSprite(def, 'ready');
+    const face = spr ? `<img src="${spr.src}" alt="">` : def.emoji;
+    const style = spr ? '' : ` style="background:${def.color}"`;
+    return `<button class="heroCard${id === selectedHero ? ' selected' : ''}" data-hero="${id}">
+      <span class="face"${style}>${face}</span>
+      <span class="nm">${t(`hero.${id}`)}</span>
+      <span class="ds">${t(`heroDesc.${id}`)}</span>
+    </button>`;
+  }).join('');
+}
+$('heroGrid').onclick = (e) => {
+  const b = e.target.closest('[data-hero]');
+  if (!b) return;
+  selectedHero = b.dataset.hero;
+  store.set('kto-hero', selectedHero);
+  renderHeroes();
+};
+$('heroGrid').ondblclick = (e) => {
+  const b = e.target.closest('[data-hero]');
+  if (!b) return;
+  selectedHero = b.dataset.hero;
+  store.set('kto-hero', selectedHero);
+  play(selectedHero);
+};
+
 // ----- buttons
-$('playBtn').onclick = play;
-$('againBtn').onclick = play;
+$('playBtn').onclick = () => { unlockAudio(); renderHeroes(); show('heroSelect'); };
+$('startBtn').onclick = () => play(selectedHero);
+$('againBtn').onclick = () => play(selectedHero);
 $('howBtn').onclick = () => show('howto');
 $('howBack').onclick = () => show('menu');
 function toMenu() {
@@ -158,7 +191,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (game.mode === 'playing') { game.pause(); show('pause'); } else if (game.mode === 'paused') { game.resume(); show(null); }
   }
-  if (e.code === 'Enter' && (!$('menu').classList.contains('hidden') || !$('over').classList.contains('hidden'))) play();
+  if (e.code === 'Enter') {
+    if (!$('heroSelect').classList.contains('hidden')) play(selectedHero);
+    else if (!$('menu').classList.contains('hidden')) { renderHeroes(); show('heroSelect'); }
+    else if (!$('over').classList.contains('hidden')) play(selectedHero);
+  }
 });
 
 // auto-pause when app goes to background
@@ -188,6 +225,7 @@ function applyLang() {
   updateBest();
   renderOver();
   renderPerks();
+  renderHeroes();
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
 

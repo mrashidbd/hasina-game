@@ -4,8 +4,9 @@ import {
 import {
   CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
 } from './data/enemies.js';
+import { HEROES } from './data/heroes.js';
 import { PERKS, BASE_MODS, perkOptions } from './perks.js';
-import { sfx } from './audio.js';
+import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
 import { getSprite } from './assets.js';
@@ -38,6 +39,7 @@ export class Game {
   }
 
   reset() {
+    if (!this.hero || !HEROES[this.hero]) this.hero = Object.keys(HEROES)[0];
     this.score = 0;
     this.wave = 0;
     this.time = 0;
@@ -51,6 +53,8 @@ export class Game {
     this.enemies = [];
     this.particles = [];
     this.floaters = [];
+    this.kicks = []; // on-screen kick animations (screen px)
+    this.fleeing = []; // caught intruders running away (screen px)
     this.powerups = [];
     this.queue = [];
     this.warnings = []; // telegraphed spawns: { type, p, t }
@@ -118,7 +122,8 @@ export class Game {
   rpx(r) { return Math.max(r * this.s, CONFIG.layout.minRadiusPx); }
 
   // ---------------------------------------------------------------- flow
-  start() {
+  start(heroId) {
+    if (heroId && HEROES[heroId]) this.hero = heroId;
     this.reset();
     this.mode = 'playing';
     this.nextWave();
@@ -232,7 +237,7 @@ export class Game {
       x: p.x, y: p.y, tx: p.tx, ty: p.ty, phase: 0,
       hp: def.hp, maxHp: def.hp, r: def.radius,
       speed: def.speed * this.speedMul * fair * rand(CONFIG.spawn.speedJitterMin, CONFIG.spawn.speedJitterMax),
-      t: 0, seed: Math.random() * 10, hitFlash: 0, summonT: def.summons?.every ?? 0,
+      t: 0, seed: Math.random() * 10, hitFlash: 0, hop: 0, summonT: def.summons?.every ?? 0,
       home: { x: p.x, y: p.y },
     };
     if (def.tier === 1) {
@@ -288,7 +293,7 @@ export class Game {
     this.damage(best, 1);
   }
 
-  damage(e, amount, viaSweep = false) {
+  damage(e, amount, viaSweep = false, heroId = null) {
     e.hp -= amount;
     e.hitFlash = CONFIG.combat.hitFlashTime;
     if (e.hp > 0) {
@@ -303,14 +308,18 @@ export class Game {
         e.x += (-dy / d) * CONFIG.combat.dash * side; e.y += (dx / d) * CONFIG.combat.dash * side;
         if (pointInPoly(BD, e.x, e.y)) { e.x -= (-dy / d) * CONFIG.combat.dash * 2 * side; e.y -= (dx / d) * CONFIG.combat.dash * 2 * side; }
       }
+      this.spawnKick(e, heroId, viaSweep);
+      e.hop = 1; // little hop while being kicked back
       this.burst(e.x, e.y, e.def.color, 6);
       return;
     }
-    this.catch(e, viaSweep);
+    this.catch(e, viaSweep, heroId);
   }
 
-  catch(e, viaSweep = false) {
+  catch(e, viaSweep = false, heroId = null) {
+    this.spawnKick(e, heroId, viaSweep);
     this.enemies.splice(this.enemies.indexOf(e), 1);
+    this.spawnFleeing(e);
     if (this.time - this.lastCatch < this.mods.comboWindow) this.combo++; else this.combo = 1;
     this.lastCatch = this.time;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
@@ -328,7 +337,8 @@ export class Game {
     if (!viaSweep) this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + e.def.sweepGain * this.mods.sweepGain);
     this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
     this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
-    sfx.catch(this.combo);
+    // A sweep plays one big sound instead of one reaction per intruder.
+    if (!viaSweep) { if (e.def.sound) play(e.def.sound); else play('catch', this.combo); }
     if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
     if (!viaSweep && Math.random() < (isMain ? 1 : CONFIG.powerups.dropChance + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
     if (e.def.splits && !viaSweep) this.split(e);
@@ -348,6 +358,43 @@ export class Game {
     }
   }
 
+  // Flee direction (normalised screen vector: from border target out to spawn home)
+  fleeVector(e) {
+    const hx = e.home?.x ?? e.x, hy = e.home?.y ?? e.y;
+    let dx = hx - e.tx, dy = hy - e.ty;
+    let len = Math.hypot(dx, dy);
+    if (!len || len < 1e-6) { dx = e.x - e.tx; dy = e.y - e.ty; len = Math.hypot(dx, dy); }
+    if (!len) return { x: 0, y: -1 };
+    return { x: dx / len, y: dy / len };
+  }
+
+  /** Hero pops up behind the intruder and kicks it; plays the hero's kick sound unless quiet. */
+  spawnKick(e, heroId, quiet = false) {
+    const hero = heroId && HEROES[heroId] ? heroId : this.hero;
+    const dir = this.fleeVector(e);
+    const dist = this.rpx(e.r) + CONFIG.kick.heroOffsetPx;
+    this.kicks.push({
+      hero,
+      x: this.sx(e.x) - dir.x * dist,
+      y: this.sy(e.y) - dir.y * dist,
+      dirX: dir.x, dirY: dir.y,
+      t: 0, life: CONFIG.kick.heroShowTime,
+    });
+    this.burst(e.x, e.y, '#ffe15a', 8);
+    if (!quiet) play(HEROES[hero].sound || 'kick');
+  }
+
+  /** Caught intruder runs back towards India (screen px) and fades away. */
+  spawnFleeing(e) {
+    const dir = this.fleeVector(e);
+    this.fleeing.push({
+      def: e.def, type: e.type,
+      x: this.sx(e.x), y: this.sy(e.y),
+      vx: dir.x * CONFIG.kick.fleeSpeedPx, vy: dir.y * CONFIG.kick.fleeSpeedPx,
+      traveled: 0, spin: Math.random() * Math.PI * 2,
+    });
+  }
+
   multiplier() { return Math.min(CONFIG.scoring.multiplierMax, 1 + Math.floor((this.combo - 1) / CONFIG.scoring.multiplierStep)); }
 
   useSweep() {
@@ -356,9 +403,12 @@ export class Game {
     this.flash = 0.5;
     sfx.sweep();
     navigator.vibrate?.(60);
+    const ids = Object.keys(HEROES);
+    let i = 0;
     for (const e of [...this.enemies]) {
-      if (e.def.tier === 1) this.damage(e, CONFIG.powerups.sweepMainDamage, true);
-      else this.damage(e, CONFIG.powerups.sweepDamage, true);
+      const heroId = CONFIG.kick.sweepAllHeroes ? ids[i++ % ids.length] : null;
+      if (e.def.tier === 1) this.damage(e, CONFIG.powerups.sweepMainDamage, true, heroId);
+      else this.damage(e, CONFIG.powerups.sweepDamage, true, heroId);
     }
   }
 
@@ -438,6 +488,18 @@ export class Game {
     for (const f of this.floaters) { f.y -= 40 * dt; f.life -= dt; }
     this.floaters = this.floaters.filter((f) => f.life > 0);
 
+    // Kick visuals and fleeing intruders: animate even when not playing (like
+    // particles), but freeze while the pause / upgrade screens are open.
+    if (this.mode !== 'paused' && this.mode !== 'perk') {
+      for (const k of this.kicks) k.t += dt;
+      this.kicks = this.kicks.filter((k) => k.t < k.life);
+      for (const f of this.fleeing) {
+        f.x += f.vx * dt; f.y += f.vy * dt;
+        f.traveled += Math.hypot(f.vx, f.vy) * dt;
+      }
+      this.fleeing = this.fleeing.filter((f) => f.traveled < CONFIG.kick.fleeDistancePx);
+    }
+
     if (this.mode !== 'playing') return;
     this.time += dt;
     this.freezeT = Math.max(0, this.freezeT - dt);
@@ -475,6 +537,7 @@ export class Game {
     for (const e of [...this.enemies]) {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
+      if (e.hop > 0) e.hop = Math.max(0, e.hop - dt / 0.25);
       if (frozen) continue;
       const tx = e.phase === 0 ? e.tx : DHAKA[0];
       const ty = e.phase === 0 ? e.ty : DHAKA[1];
@@ -608,8 +671,14 @@ export class Game {
     // spawn warnings
     for (const w of this.warnings) this.drawWarning(w, t);
 
+    // fleeing intruders (before live enemies)
+    for (const f of this.fleeing) this.drawFleeing(f, t);
+
     // intruders
     for (const e of this.enemies) this.drawEnemy(e, t);
+
+    // kicks (hero pops up behind the intruder, on top)
+    for (const k of this.kicks) this.drawKick(k);
     if (this.mode === 'playing' && this.stats.caught === 0 && this.enemies.length) {
       const e = this.enemies[0];
       const x = this.sx(e.x), y = this.sy(e.y) - this.rpx(e.r) - 22 - Math.abs(Math.sin(t * 6)) * 8;
@@ -721,7 +790,7 @@ export class Game {
 
   drawEnemy(e, t) {
     const { ctx } = this;
-    const x = this.sx(e.x), y = this.sy(e.y);
+    const x = this.sx(e.x), y = this.sy(e.y) - (e.hop > 0 ? Math.sin((1 - e.hop) * Math.PI) * CONFIG.kick.fleeHopPx * 0.5 : 0);
     const r = this.rpx(e.r);
     let alpha = 1;
     if (e.def.stealth) alpha = 0.25 + 0.75 * Math.max(0, Math.sin(e.t * 2.2 + e.seed)) ** 2;
@@ -779,6 +848,113 @@ export class Game {
       ctx.fillStyle = '#fff';
       ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, y + r + 10);
     }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Hero pops up behind the intruder (screen px): ready pose, then kick. */
+  drawKick(k) {
+    const { ctx } = this;
+    const def = HEROES[k.hero] || HEROES[Object.keys(HEROES)[0]];
+    const K = CONFIG.kick;
+    const life = k.life;
+    const t = Math.min(k.t, life);
+    const alpha = t < life * 0.7 ? 1 : Math.max(0, 1 - (t - life * 0.7) / (life * 0.3));
+    const pop = 0.6 + 0.4 * Math.min(1, k.t / 0.08);
+    const size = K.heroSizePx * pop;
+    const winding = k.t < K.windupTime;
+    const pose = winding ? 'ready' : 'kick';
+    const sprite = getSprite(def, pose);
+    const cx = k.x + k.dirX * size * 0.55;
+    const cy = k.y + k.dirY * size * 0.55;
+
+    ctx.globalAlpha = alpha;
+    ctx.save();
+    ctx.translate(k.x, k.y);
+    if (sprite) {
+      if (k.dirX < 0) ctx.scale(-1, 1); // sprites face right
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+    } else {
+      const r = size / 2;
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.stroke();
+      ctx.font = `${r * 1.3}px ${EMOJI_FONT}`;
+      ctx.fillText(def.emoji, 0, 0);
+      // foot emoji swings from behind to the front during the kick
+      const p = winding ? 0 : Math.min(1, (k.t - K.windupTime) / Math.max(0.0001, life - K.windupTime));
+      const off = (p * 2 - 1) * size * 0.62;
+      ctx.font = `${size * 0.52}px ${EMOJI_FONT}`;
+      ctx.fillText('🦶', k.dirX * off, k.dirY * off);
+    }
+    ctx.restore();
+
+    // impact lines at the contact point (once the foot lands)
+    if (!winding && alpha > 0) {
+      const base = Math.atan2(k.dirY, k.dirX);
+      ctx.strokeStyle = '#ffe15a';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const ang = base + (i - 1.5) * 0.45;
+        const len = size * 0.28;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(ang) * size * 0.22, cy + Math.sin(ang) * size * 0.22);
+        ctx.lineTo(cx + Math.cos(ang) * (size * 0.22 + len), cy + Math.sin(ang) * (size * 0.22 + len));
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Caught intruder running back towards India (screen px), fading away. */
+  drawFleeing(f, t) {
+    const { ctx } = this;
+    const K = CONFIG.kick;
+    const def = f.def;
+    const r = this.rpx(def.radius);
+    const alpha = K.fleeFade ? Math.max(0, 1 - f.traveled / K.fleeDistancePx) : 1;
+    const hopT = Math.min(1, f.traveled / (K.fleeSpeedPx * 0.25));
+    const hop = hopT < 1 ? Math.sin(hopT * Math.PI) * K.fleeHopPx : 0;
+    const tilt = Math.sin(f.traveled * 0.05 + f.spin) * K.fleeWobbleDeg * Math.PI / 180;
+    const sprite = getSprite(def, 'kicked');
+
+    ctx.globalAlpha = alpha;
+    if (def.tier === 1) { // gold aura kept while fleeing
+      const g = ctx.createRadialGradient(f.x, f.y - hop, r * 0.8, f.x, f.y - hop, r * 2.2);
+      g.addColorStop(0, `rgba(255,215,0,${0.35 + 0.15 * Math.sin(t * 6)})`);
+      g.addColorStop(1, 'rgba(255,215,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(f.x, f.y - hop, r * 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(f.x, f.y - hop + r * 0.9, r * 0.8, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(f.x, f.y - hop);
+    ctx.rotate(tilt);
+    if (f.vx < 0) ctx.scale(-1, 1); // mirrored when moving left
+    ctx.fillStyle = def.color;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.stroke();
+    if (sprite) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(0, 0, r - 2, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
+      ctx.restore();
+    } else {
+      ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
+      ctx.fillText(def.emoji, 0, 0);
+    }
+    ctx.restore();
+
+    // dust puffs behind
+    ctx.font = `${r * 0.75}px ${EMOJI_FONT}`;
+    ctx.fillText('💨', f.x - f.vx * 0.045, f.y - f.vy * 0.045 - hop * 0.5);
+    ctx.fillText('💨', f.x - f.vx * 0.099, f.y - f.vy * 0.099 - hop * 0.4);
     ctx.globalAlpha = 1;
   }
 

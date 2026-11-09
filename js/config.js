@@ -103,10 +103,16 @@ export const CONFIG = {
     choices: 3, // count, number of upgrade choices offered
   },
   kick: {
-    heroShowTime: 0.35, // s, hero shown before a kick (later phase, unused)
-    kickDuration: 0.25, // s, kick animation duration (later phase, unused)
-    fleeDistancePx: 300, // px, flee distance after a kick (later phase, unused)
-    fleeSpeedPx: 520, // px/s, flee speed after a kick (later phase, unused)
-    fleeFade: true, // fade out while fleeing (later phase, unused)
+    heroShowTime: 0.35, // s, hero stays on screen per kick
+    kickDuration: 0.25, // s, kick animation duration
+    heroSizePx: 64, // px, hero sprite/emoji size during a kick
+    heroOffsetPx: 10, // px, hero centre sits this far behind the intruder radius
+    windupTime: 0.06, // s, ready pose before the kick pose
+    fleeDistancePx: 300, // px, flee distance after a catch
+    fleeSpeedPx: 520, // px/s, flee speed after a catch
+    fleeHopPx: 18, // px, upward hop at the start of the flee
+    fleeWobbleDeg: 12, // deg, fleeing tilt/wobble amplitude
+    fleeFade: true, // fade out while fleeing
+    sweepAllHeroes: true, // bool, sweep kicks cycle through all heroes
   },
 };

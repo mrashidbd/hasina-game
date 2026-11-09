@@ -131,6 +131,14 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
 .stats div { display: flex; justify-content: space-between; gap: 6px; padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.05); font-size: 13px; }
 .stats span { opacity: .7; text-align: left; }
 
+.heroGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0; }
+.heroCard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; }
+.heroCard.selected { border-color: var(--mint); background: rgba(124, 255, 178, 0.12); box-shadow: 0 0 18px rgba(124, 255, 178, 0.35); }
+.heroCard .face { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 36px; overflow: hidden; background: rgba(255,255,255,.08); flex: none; }
+.heroCard .face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.heroCard .nm { font-weight: 800; font-size: 15px; }
+.heroCard .ds { font-weight: 400; font-size: 12px; opacity: .7; text-align: center; line-height: 1.3; }
+
 @media (max-height: 640px) {
   .panel { padding: 16px; gap: 7px; }
   .logo { font-size: 36px; }
