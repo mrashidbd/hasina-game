@@ -1,6 +1,6 @@
 # Plan v2 — real roster, heroes that kick, accurate map
 
-Status: **proposed 2026-11-09, waiting for user go-ahead.** Update the checkboxes as work lands.
+Status: **approved 2026-11-09, in progress** (work on branch `v2`; `main` = live site). Update the checkboxes as work lands.
 
 ## Goals (from the user)
 1. Accurate Bangladesh map.
@@ -27,16 +27,16 @@ Status: **proposed 2026-11-09, waiting for user go-ahead.** Update the checkboxe
 
 ### A. Prompt documents (first, so art/sound can be produced in parallel)
 Written by Claude (needs judgment on tone and likeness), reviewed by the user.
-- [ ] `docs/prompts/enemy-characters.md` — shared style block + one section per enemy:
+- [x] `docs/prompts/enemy-characters.md` — shared style block + one section per enemy:
       role in game, visual exaggerations, outfit/prop, colour, poses, file names.
-- [ ] `docs/prompts/self-characters.md` — same for the 4 heroes (heroic, likeable).
-- [ ] `docs/prompts/sound-design.md` — per-enemy kick reaction, hero kick whooshes,
+- [x] `docs/prompts/self-characters.md` — same for the 4 heroes (heroic, likeable).
+- [x] `docs/prompts/sound-design.md` — per-enemy kick reaction, hero kick whooshes,
       UI/game sounds, music loop; with duration, format and loudness specs.
 - Tone rule: political satire of public persona — cartoon slapstick, no gore, no
   sexualised depictions, no slurs, no invented criminal claims. Likeness comes from the
   reference photos; prompts describe style, exaggeration, outfit and props.
 
-### B. Config & data refactor (foundation) — delegate
+### B. Config & data refactor (foundation) — delegate ✅ done 2026-11-09 (opencode)
 - `js/config.js`: every tunable in one place (spawn, speeds, waves, scoring, combo,
   power-ups, perks base values, kick/flee timings, `FLEE_DISTANCE_PX = 300`, hit radius…).
 - `js/data/enemies.js`, `js/data/heroes.js`: roster data (tier, stats, behaviour,

@@ -20,4 +20,4 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
       (wave still clears). Unlikely, but worth knowing when tuning spawn constants.
 
 ## Content placeholders (user to decide)
-- [ ] Real names / art for tier 2 and tier 3 characters (`js/characters.js`, `char.*` in `js/i18n.js`).
+- [ ] Real names / art for tier 2 and tier 3 characters — roster names given 2026-11-09, wiring in plan phase E (`js/data/enemies.js`, `char.*` in `js/i18n.js`).

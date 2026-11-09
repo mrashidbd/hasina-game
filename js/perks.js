@@ -1,22 +1,23 @@
 // ---------------------------------------------------------------------------
-// Upgrades ("perks") offered between waves. After every PERK_EVERY-th cleared
-// wave (see js/game.js) the player picks one of three random options.
+// Upgrades ("perks") offered between waves. After every CONFIG.perks.every-th
+// cleared wave (see js/game.js) the player picks one of three random options.
 //
 // Each perk changes `game.mods` (run modifiers, reset every run) or the game
 // state directly. `max` = how many times it can be taken per run.
 // `available(game)` (optional) hides a perk when it would be useless.
 // Names/descriptions: `perkName.<id>` / `perkDesc.<id>` in js/i18n.js.
 // ---------------------------------------------------------------------------
+import { CONFIG } from './config.js';
 
 /** Starting values for every run. game.js reads these instead of constants. */
 export const BASE_MODS = {
   tapRadius: 1,      // multiplier on the tap hit radius
   knockback: 1,      // multiplier on the push-back when a tough intruder is hit
   sweepGain: 1,      // multiplier on how fast catches fill the Sweep meter
-  dropBonus: 0,      // added to the 7% power-up drop chance
-  comboWindow: 1.5,  // seconds between catches to keep a combo
-  freezeTime: 4,     // seconds a Freeze lasts
-  wallTime: 7,       // seconds a Border Wall lasts
+  dropBonus: 0,      // added to the power-up drop chance
+  comboWindow: CONFIG.scoring.comboWindow, // seconds between catches to keep a combo
+  freezeTime: CONFIG.powerups.freezeTime, // seconds a Freeze lasts
+  wallTime: CONFIG.powerups.wallTime, // seconds a Border Wall lasts
 };
 
 export const PERKS = {
@@ -27,8 +28,8 @@ export const PERKS = {
   rhythm: { emoji: '⏱️', max: 2, apply: (g) => { g.mods.comboWindow += 0.5; } },
   cold: { emoji: '🧊', max: 2, apply: (g) => { g.mods.freezeTime += 2; g.mods.wallTime += 3; } },
   shield: {
-    emoji: '🛡️', max: 99, available: (g) => g.shield < 3,
-    apply: (g) => { g.shield = Math.min(3, g.shield + 1); },
+    emoji: '🛡️', max: 99, available: (g) => g.shield < CONFIG.powerups.maxShield,
+    apply: (g) => { g.shield = Math.min(CONFIG.powerups.maxShield, g.shield + 1); },
   },
 };
 

@@ -34,7 +34,10 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 | `index.html` | Screens (menu, how-to, pause, game over) and the HUD |
 | `css/style.css` | UI styling, responsive, safe-area aware (notches) |
 | `js/map.js` | Simplified outline of Bangladesh (lon/lat) tagged by border type (India / Myanmar / coast), projection, geometry helpers |
-| `js/characters.js` | **Roster and balance**: tiers, penalties, emoji, sprites, HP, speed, points, behaviours; power-ups |
+| `js/config.js` | **All global tunables** (`CONFIG`): waves, spawns, scoring, power-ups, kick… |
+| `js/data/enemies.js` | **Roster and balance**: tiers, penalties, emoji, sprites, HP, speed, points, behaviours; power-ups |
+| `js/data/heroes.js` / `js/data/sounds.js` | Self characters; sound catalogue (files with synth fallback) |
+| `js/assets.js` | Sprite loading with emoji fallback |
 | `js/perks.js` | Between-wave upgrades and the per-run modifiers they change |
 | `js/game.js` | Game engine: waves, spawning, movement, input, scoring, rendering |
 | `js/audio.js` | Synthesized sound effects (WebAudio, no files) |
@@ -61,7 +64,7 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 
 ## Character tiers (all names and art are placeholders)
 
-Everything is configured in `js/characters.js`. Names, in English and Bangla, are in `js/i18n.js` under `char`.
+Everything is configured in `js/data/enemies.js` (global numbers in `js/config.js`). Names, in English and Bangla, are in `js/i18n.js` under `char`.
 
 | Tier | Who | If they get in |
 |---|---|---|
@@ -145,10 +148,11 @@ everyone on screen at once. Hasina only takes 4 damage.
 - The game pauses automatically when the app goes to the background.
 
 ## Swapping in real characters
-In `js/characters.js`, set `sprite: 'assets/<name>.png'` on any character. A square PNG works best.
-It's drawn clipped to the character's circle, and the emoji is used only when no sprite is set.
-Change `name` to rename a character in the how-to table and on the game-over screen.
-Add new files to `ASSETS` in `sw.js` so they work offline.
+Art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using the
+names listed there, then set the paths in `js/data/enemies.js` / `js/data/heroes.js`
+(`sprites.walk`, `sprites.kicked`, …) and `js/data/sounds.js` (`file`). Until a file is set,
+the game draws the emoji and plays the built-in synth sound. Names live in `js/i18n.js`
+(`char.*`, `hero.*`). The service worker caches assets automatically after first load.
 
 ## Roadmap / ideas
 - [ ] Real names and art for the tier 2 and tier 3 characters

@@ -60,6 +60,9 @@ const STRINGS = {
       small1: 'Basic', small2: 'Fast, zig-zags', small3: 'Fades in and out', small4: 'Comes in packs of 3',
       small5: 'Splits in two when caught',
     },
+    hero: {
+      farmer: 'Farmer', studentM: 'Student', studentF: 'Student', common: 'Common People',
+    },
     perkTitle: 'Choose an upgrade',
     perkSub: 'Wave {n} cleared. Pick one, it lasts for the rest of the run.',
     perkName: {
@@ -138,6 +141,9 @@ const STRINGS = {
       senior3: 'ছোট নেতাদের ডাকে', senior4: 'খুব শক্ত, খুব ধীর',
       small1: 'সাধারণ', small2: 'দ্রুত, এঁকেবেঁকে চলে', small3: 'দেখা যায়, আবার মিলিয়ে যায়', small4: '৩ জনের দলে আসে',
       small5: 'ধরলে দুই ভাগ হয়ে যায়',
+    },
+    hero: {
+      farmer: 'কৃষক', studentM: 'ছাত্র', studentF: 'ছাত্রী', common: 'সাধারণ মানুষ',
     },
     perkTitle: 'একটি আপগ্রেড বেছে নাও',
     perkSub: 'ওয়েভ {n} শেষ। একটি বেছে নাও, পুরো খেলায় থাকবে।',

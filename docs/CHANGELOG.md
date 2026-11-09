@@ -3,6 +3,18 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-09 — v2 plan, prompt docs, config refactor (branch `v2`)
+- New workflow: Claude reviews; opencode/agy write code (see CLAUDE.md "Team workflow").
+- `docs/PLAN-v2.md` (approved), `docs/prompts/enemy-characters.md`,
+  `docs/prompts/self-characters.md`, `docs/prompts/sound-design.md` (for Nano Banana / ElevenLabs).
+- Phase B (opencode, reviewed): `js/config.js` holds every gameplay tunable; roster moved
+  to `js/data/enemies.js` (`sprites: {walk, kicked, idle}`, `sound`); new
+  `js/data/heroes.js`, `js/data/sounds.js`, `js/assets.js`; `audio.js` gains `play()` with
+  file→synth fallback. `js/characters.js` removed. SW `kto-v5`.
+- Verified: identical wave count/interval/speed/boss schedule for waves 1–20, full smoke
+  test (spawn, catch, split, perk screen, quit-save), sprite load + missing-sound fallback,
+  no console errors. No gameplay change intended.
+
 ## 2026-11-09 — Branch setup
 - Pushed docs + gameplay pass 1, then created `main` from the same commit.
 - Enabled GitHub Pages (source: GitHub Actions); user allowed `main` in the `github-pages`

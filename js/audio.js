@@ -1,13 +1,18 @@
-// Tiny synthesized sound effects (no audio files needed).
+// Tiny synthesized sound effects (no audio files needed unless SOUNDS gives one).
+import { SOUNDS } from './data/sounds.js';
+
 let ctx = null;
 let muted = false;
 try { muted = localStorage.getItem('kto-muted') === '1'; } catch { /* storage unavailable */ }
+
+const buffers = new Map(); // sound id -> decoded AudioBuffer
 
 export function unlockAudio() {
   if (!ctx) {
     try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
   if (ctx.state === 'suspended') ctx.resume();
+  void preloadSounds();
 }
 
 export const isMuted = () => muted;
@@ -31,7 +36,7 @@ function tone(freq, dur, { type = 'sine', vol = 0.12, slide = 0, delay = 0 } = {
   osc.stop(t0 + dur + 0.02);
 }
 
-export const sfx = {
+const SYNTH = {
   hit: () => tone(320, 0.08, { type: 'square', vol: 0.06, slide: -120 }),
   catch: (combo = 1) => tone(440 + Math.min(combo, 20) * 30, 0.12, { type: 'triangle', vol: 0.12, slide: 200 }),
   miss: () => tone(140, 0.08, { type: 'sine', vol: 0.05 }),
@@ -42,4 +47,53 @@ export const sfx = {
   leak: () => tone(220, 0.25, { type: 'sawtooth', vol: 0.08, slide: -140 }),
   shield: () => tone(300, 0.3, { type: 'square', vol: 0.1, slide: -200 }),
   over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', vol: 0.09, delay: i * 0.18 })),
+};
+
+/** Fetch and decode every non-null sound file. No-ops until the AudioContext exists. */
+export async function preloadSounds() {
+  if (!ctx) return;
+  for (const [id, entry] of Object.entries(SOUNDS)) {
+    if (!entry.file || buffers.has(id)) continue;
+    try {
+      const res = await fetch(entry.file);
+      if (!res.ok) continue;
+      const data = await res.arrayBuffer();
+      const buf = await ctx.decodeAudioData(data);
+      buffers.set(id, buf);
+    } catch { /* missing/undecodable file: keep the synth fallback */ }
+  }
+}
+
+/** Play the decoded file when loaded, otherwise the synth fallback. Never throws. */
+export function play(id, arg) {
+  if (muted || !ctx) return;
+  const buffer = buffers.get(id);
+  if (buffer) {
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const g = ctx.createGain();
+      g.gain.value = SOUNDS[id]?.volume ?? 1;
+      src.connect(g).connect(ctx.destination);
+      src.start();
+    } catch { /* ignore playback errors */ }
+    return;
+  }
+  const fn = SYNTH[SOUNDS[id]?.synth];
+  if (fn) {
+    try { fn(arg); } catch { /* ignore */ }
+  }
+}
+
+export const sfx = {
+  hit: () => play('hit'),
+  catch: (combo = 1) => play('catch', combo),
+  miss: () => play('miss'),
+  power: () => play('power'),
+  wave: () => play('wave'),
+  boss: () => play('boss'),
+  sweep: () => play('sweep'),
+  leak: () => play('leak'),
+  shield: () => play('shield'),
+  over: () => play('over'),
 };

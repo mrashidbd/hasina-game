@@ -3,21 +3,13 @@ import {
 } from './map.js';
 import {
   CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
-} from './characters.js';
+} from './data/enemies.js';
 import { PERKS, BASE_MODS, perkOptions } from './perks.js';
 import { sfx } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
+import { CONFIG } from './config.js';
+import { getSprite } from './assets.js';
 
-const PAD = 0.7;            // map units of "India" kept visible around Bangladesh
-const SPAWN_MIN = 0.5;      // spawn distance outside the border (map units)
-const SPAWN_MAX = 0.8;
-const SPAWN_NOMINAL = (SPAWN_MIN + SPAWN_MAX) / 2;
-const CLOSE_CALL = 0.12;    // distance to border that counts as a close call
-const DANGER = 0.18;        // distance at which an intruder is flagged as dangerous
-const POWERUP_CHANCE = 0.07;
-const MAX_SHIELD = 3;
-const WARN_TIME = 0.7;      // seconds a spawn is telegraphed before the intruder appears
-const PERK_EVERY = 2;       // offer an upgrade after every Nth cleared wave
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -36,7 +28,7 @@ export class Game {
     this.ctx = canvas.getContext('2d');
     this.hooks = hooks; // onHud, onBanner, onGameOver, onPerks
     this.mode = 'menu';
-    this.insets = { top: 64, bottom: 90 };
+    this.insets = { top: CONFIG.layout.hudTop, bottom: CONFIG.layout.hudBottom };
     this.reset();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -77,7 +69,7 @@ export class Game {
 
   // ---------------------------------------------------------------- layout
   resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, CONFIG.layout.dprCap);
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.w = w; this.h = h; this.dpr = dpr;
@@ -88,8 +80,8 @@ export class Game {
 
     const top = this.insets.top;
     const bottom = this.insets.bottom;
-    const mw = BBOX.maxX - BBOX.minX + PAD * 2;
-    const mh = BBOX.maxY - BBOX.minY + PAD * 2;
+    const mw = BBOX.maxX - BBOX.minX + CONFIG.layout.pad * 2;
+    const mh = BBOX.maxY - BBOX.minY + CONFIG.layout.pad * 2;
     const availH = Math.max(100, h - top - bottom);
     this.s = Math.min(w / mw, availH / mh);
     const cx = (BBOX.minX + BBOX.maxX) / 2;
@@ -123,7 +115,7 @@ export class Game {
 
   sx(x) { return this.ox + x * this.s; }
   sy(y) { return this.oy + y * this.s; }
-  rpx(r) { return Math.max(r * this.s, 15); }
+  rpx(r) { return Math.max(r * this.s, CONFIG.layout.minRadiusPx); }
 
   // ---------------------------------------------------------------- flow
   start() {
@@ -139,39 +131,39 @@ export class Game {
     this.wave += 1;
     const n = this.wave;
     this.waveStats = { taps: 0, hits: 0, leaks: 0 };
-    const count = 5 + Math.floor(n * 1.8);
+    const count = CONFIG.waves.countBase + Math.floor(n * CONFIG.waves.countPerWave);
     // Weighting: the basic small leader is the backbone; other small leaders grow
     // with the wave number, senior leaders grow more slowly.
     const pool = Object.entries(CHARACTERS)
       .filter(([, c]) => c.tier > 1 && n >= c.unlock)
-      .map(([k, c]) => [k, k === 'small1' ? 10 : c.tier === 3 ? 2 + n * 0.6 : 1 + n * 0.35]);
+      .map(([k, c]) => [k, k === CONFIG.waves.poolBackboneId ? CONFIG.waves.poolBackboneWeight : c.tier === 3 ? CONFIG.waves.poolTier3Base + n * CONFIG.waves.poolTier3PerWave : CONFIG.waves.poolTier2Base + n * CONFIG.waves.poolTier2PerWave]);
     const q = [];
     for (let i = 0; i < count; i++) q.push(weighted(pool));
     const main = isMainWave(n);
     if (main) q.splice(Math.floor(q.length / 2), 0, MAIN_ID);
     this.queue = q;
-    this.spawnInterval = Math.max(0.3, 1.5 * Math.pow(0.92, n - 1));
-    this.speedMul = Math.min(2.1, 1 + 0.07 * (n - 1));
-    this.spawnT = 1.2;
+    this.spawnInterval = Math.max(CONFIG.waves.intervalMin, CONFIG.waves.intervalBase * Math.pow(CONFIG.waves.intervalDecay, n - 1));
+    this.speedMul = Math.min(CONFIG.waves.speedMax, CONFIG.waves.speedBase + CONFIG.waves.speedPerWave * (n - 1));
+    this.spawnT = CONFIG.waves.firstSpawnDelay;
     this.hooks.onBanner?.(tr('wave', { n }), main ? tr('mainIncoming') : tr('nIntruders', { n: q.length }));
     sfx.wave();
   }
 
   waveCleared() {
     const n = this.wave;
-    let bonus = 50 * n;
+    let bonus = CONFIG.scoring.clearPerWave * n;
     const acc = this.waveStats.taps ? this.waveStats.hits / this.waveStats.taps : 1;
     let sub = tr('clearBonus', { n: bonus });
-    if (acc >= 0.9) { bonus += 25 * n; sub += ` · ${tr('sharp', { n: 25 * n })}`; }
-    if (!this.waveStats.leaks) { bonus += 30 * n; sub += ` · ${tr('noLeaks', { n: 30 * n })}`; }
+    if (acc >= CONFIG.scoring.sharpshooterAccuracy) { bonus += CONFIG.scoring.sharpshooterPerWave * n; sub += ` · ${tr('sharp', { n: CONFIG.scoring.sharpshooterPerWave * n })}`; }
+    if (!this.waveStats.leaks) { bonus += CONFIG.scoring.sealedPerWave * n; sub += ` · ${tr('noLeaks', { n: CONFIG.scoring.sealedPerWave * n })}`; }
     this.score += bonus;
     this.hooks.onBanner?.(tr('cleared', { n }), sub);
-    this.breakT = 2.4;
+    this.breakT = CONFIG.waves.breakTime;
   }
 
-  /** After the break: offer an upgrade every PERK_EVERY waves, otherwise go on. */
+  /** After the break: offer an upgrade every CONFIG.perks.every waves, otherwise go on. */
   afterBreak() {
-    const options = this.wave % PERK_EVERY === 0 ? perkOptions(this, 3) : [];
+    const options = this.wave % CONFIG.perks.every === 0 ? perkOptions(this, CONFIG.perks.choices) : [];
     if (!options.length || !this.hooks.onPerks) { this.nextWave(); return; }
     this.mode = 'perk';
     this.hooks.onPerks(options);
@@ -196,8 +188,8 @@ export class Game {
   // ---------------------------------------------------------------- spawning
   spawnPoint() {
     const v = this.view;
-    const m = 0.06;
-    for (let tries = 0; tries < 40; tries++) {
+    const m = CONFIG.spawn.viewMargin;
+    for (let tries = 0; tries < CONFIG.spawn.tries; tries++) {
       let r = Math.random() * INDIA_LEN;
       let edge = INDIA_EDGES[0];
       for (const e of INDIA_EDGES) { if ((r -= e.len) <= 0) { edge = e; break; } }
@@ -206,21 +198,21 @@ export class Game {
       const py = edge.a[1] + (edge.b[1] - edge.a[1]) * t;
       let nx = -(edge.b[1] - edge.a[1]) / edge.len;
       let ny = (edge.b[0] - edge.a[0]) / edge.len;
-      if (pointInPoly(BD, px + nx * 0.02, py + ny * 0.02)) { nx = -nx; ny = -ny; }
-      const d = rand(SPAWN_MIN, SPAWN_MAX);
+      if (pointInPoly(BD, px + nx * CONFIG.spawn.normalProbe, py + ny * CONFIG.spawn.normalProbe)) { nx = -nx; ny = -ny; }
+      const d = rand(CONFIG.spawn.min, CONFIG.spawn.max);
       const x = clamp(px + nx * d, v.minX + m, v.maxX - m);
       const y = clamp(py + ny * d, v.minY + m, v.maxY - m);
       if (pointInPoly(BD, x, y) || pointInPoly(SEA, x, y) || pointInPoly(MYANMAR, x, y)) continue;
-      if (distToPoly(BD, x, y) < 0.3) continue;
-      return { x, y, tx: px - nx * 0.05, ty: py - ny * 0.05 };
+      if (distToPoly(BD, x, y) < CONFIG.spawn.minBorderDist) continue;
+      return { x, y, tx: px - nx * CONFIG.spawn.targetInset, ty: py - ny * CONFIG.spawn.targetInset };
     }
     return null;
   }
 
-  /** Pick a spawn point now and show a warning there; the intruder appears WARN_TIME later. */
+  /** Pick a spawn point now and show a warning there; the intruder appears later. */
   warn(type) {
     const p = this.spawnPoint();
-    if (p) this.warnings.push({ type, p, t: WARN_TIME });
+    if (p) this.warnings.push({ type, p, t: CONFIG.spawn.warnTime });
   }
 
   /**
@@ -234,17 +226,17 @@ export class Game {
     // On narrow screens a spawn can be clamped close to the border. Scale speed so the
     // time-to-border stays about the same as on a large screen (fair on phones).
     let fair = 1;
-    if (primary) fair = clamp(Math.hypot(p.tx - p.x, p.ty - p.y) / SPAWN_NOMINAL, 0.5, 1);
+    if (primary) fair = clamp(Math.hypot(p.tx - p.x, p.ty - p.y) / ((CONFIG.spawn.min + CONFIG.spawn.max) / 2), CONFIG.spawn.fairnessMin, CONFIG.spawn.fairnessMax);
     const e = {
       type, def,
       x: p.x, y: p.y, tx: p.tx, ty: p.ty, phase: 0,
       hp: def.hp, maxHp: def.hp, r: def.radius,
-      speed: def.speed * this.speedMul * fair * rand(0.9, 1.1),
+      speed: def.speed * this.speedMul * fair * rand(CONFIG.spawn.speedJitterMin, CONFIG.spawn.speedJitterMax),
       t: 0, seed: Math.random() * 10, hitFlash: 0, summonT: def.summons?.every ?? 0,
       home: { x: p.x, y: p.y },
     };
     if (def.tier === 1) {
-      e.hp = e.maxHp = def.hp + this.mainCount * 5; // tougher every appearance
+      e.hp = e.maxHp = def.hp + this.mainCount * CONFIG.waves.mainHpPerAppearance; // tougher every appearance
       this.mainCount++;
       sfx.boss();
       navigator.vibrate?.(80);
@@ -255,8 +247,8 @@ export class Game {
       for (let i = 1; i < def.group; i++) {
         const a = Math.random() * Math.PI * 2;
         this.spawn(type, {
-          x: p.x + Math.cos(a) * 0.12, y: p.y + Math.sin(a) * 0.12,
-          tx: p.tx + rand(-0.1, 0.1), ty: p.ty + rand(-0.1, 0.1),
+          x: p.x + Math.cos(a) * CONFIG.spawn.packSpread, y: p.y + Math.sin(a) * CONFIG.spawn.packSpread,
+          tx: p.tx + rand(-CONFIG.spawn.packTargetJitter, CONFIG.spawn.packTargetJitter), ty: p.ty + rand(-CONFIG.spawn.packTargetJitter, CONFIG.spawn.packTargetJitter),
         });
       }
     }
@@ -272,7 +264,7 @@ export class Game {
 
     // power-ups first
     for (const pu of this.powerups) {
-      if (Math.hypot(this.sx(pu.x) - px, this.sy(pu.y) - py) < 30) {
+      if (Math.hypot(this.sx(pu.x) - px, this.sy(pu.y) - py) < CONFIG.input.powerupTapRadiusPx) {
         this.collect(pu);
         return;
       }
@@ -282,7 +274,7 @@ export class Game {
     let best = null; let bestD = Infinity;
     for (const e of this.enemies) {
       const d = Math.hypot(this.sx(e.x) - px, this.sy(e.y) - py);
-      const hitR = Math.max(this.rpx(e.r) * 1.25, 26) * this.mods.tapRadius;
+      const hitR = Math.max(this.rpx(e.r) * CONFIG.input.hitRadiusMultiplier, CONFIG.input.minHitRadiusPx) * this.mods.tapRadius;
       if (d < hitR && d < bestD) { best = e; bestD = d; }
     }
     if (!best) {
@@ -298,18 +290,18 @@ export class Game {
 
   damage(e, amount, viaSweep = false) {
     e.hp -= amount;
-    e.hitFlash = 0.15;
+    e.hitFlash = CONFIG.combat.hitFlashTime;
     if (e.hp > 0) {
       sfx.hit();
       // knock back away from the border
       const dx = e.x - e.tx, dy = e.y - e.ty;
       const d = Math.hypot(dx, dy) || 1;
-      const kb = 0.035 * this.mods.knockback;
+      const kb = CONFIG.combat.knockback * this.mods.knockback;
       e.x += (dx / d) * kb; e.y += (dy / d) * kb;
       if (e.def.dash) { // jump sideways, so the next tap has to chase it
         const side = Math.random() < 0.5 ? -1 : 1;
-        e.x += (-dy / d) * 0.16 * side; e.y += (dx / d) * 0.16 * side;
-        if (pointInPoly(BD, e.x, e.y)) { e.x -= (-dy / d) * 0.32 * side; e.y -= (dx / d) * 0.32 * side; }
+        e.x += (-dy / d) * CONFIG.combat.dash * side; e.y += (dx / d) * CONFIG.combat.dash * side;
+        if (pointInPoly(BD, e.x, e.y)) { e.x -= (-dy / d) * CONFIG.combat.dash * 2 * side; e.y -= (dx / d) * CONFIG.combat.dash * 2 * side; }
       }
       this.burst(e.x, e.y, e.def.color, 6);
       return;
@@ -323,22 +315,22 @@ export class Game {
     this.lastCatch = this.time;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     const mult = this.multiplier();
-    let pts = viaSweep ? Math.round(e.def.points * 0.5) : e.def.points * mult;
+    let pts = viaSweep ? Math.round(e.def.points * CONFIG.scoring.sweepPointsFactor) : e.def.points * mult;
     const near = distToPoly(BD, e.x, e.y);
     let label = `+${fmt(pts)}`;
-    if (!viaSweep && near < CLOSE_CALL) {
-      pts += 25; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
+    if (!viaSweep && near < CONFIG.scoring.closeCallDistance) {
+      pts += CONFIG.scoring.closeCallBonus; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
     }
     const isMain = e.def.tier === 1;
     if (isMain) this.stats.mains++;
     this.score += pts;
     this.stats.caught++;
-    if (!viaSweep) this.sweep = Math.min(100, this.sweep + e.def.sweepGain * this.mods.sweepGain);
+    if (!viaSweep) this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + e.def.sweepGain * this.mods.sweepGain);
     this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
     this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
     sfx.catch(this.combo);
     if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
-    if (!viaSweep && Math.random() < (isMain ? 1 : POWERUP_CHANCE + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
+    if (!viaSweep && Math.random() < (isMain ? 1 : CONFIG.powerups.dropChance + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
     if (e.def.splits && !viaSweep) this.split(e);
   }
 
@@ -348,32 +340,32 @@ export class Game {
     const dx = e.x - e.tx, dy = e.y - e.ty;
     const d = Math.hypot(dx, dy) || 1;
     for (let i = 0; i < n; i++) {
-      const side = (i - (n - 1) / 2) * 0.14;
-      const x = e.x + (dx / d) * 0.1 + (-dy / d) * side;
-      const y = e.y + (dy / d) * 0.1 + (dx / d) * side;
+      const side = (i - (n - 1) / 2) * CONFIG.combat.splitterSpacing;
+      const x = e.x + (dx / d) * CONFIG.combat.splitterPush + (-dy / d) * side;
+      const y = e.y + (dy / d) * CONFIG.combat.splitterPush + (dx / d) * side;
       if (pointInPoly(BD, x, y)) continue;
       this.spawn(into, { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side });
     }
   }
 
-  multiplier() { return Math.min(5, 1 + Math.floor((this.combo - 1) / 5)); }
+  multiplier() { return Math.min(CONFIG.scoring.multiplierMax, 1 + Math.floor((this.combo - 1) / CONFIG.scoring.multiplierStep)); }
 
   useSweep() {
-    if (this.mode !== 'playing' || this.sweep < 100) return;
+    if (this.mode !== 'playing' || this.sweep < CONFIG.scoring.sweepMax) return;
     this.sweep = 0;
     this.flash = 0.5;
     sfx.sweep();
     navigator.vibrate?.(60);
     for (const e of [...this.enemies]) {
-      if (e.def.tier === 1) this.damage(e, 4, true);
-      else this.damage(e, 99, true);
+      if (e.def.tier === 1) this.damage(e, CONFIG.powerups.sweepMainDamage, true);
+      else this.damage(e, CONFIG.powerups.sweepDamage, true);
     }
   }
 
   dropPowerup(x, y) {
-    const kinds = Object.keys(POWERUPS).filter((k) => k !== 'shield' || this.shield < MAX_SHIELD);
+    const kinds = Object.keys(POWERUPS).filter((k) => k !== 'shield' || this.shield < CONFIG.powerups.maxShield);
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    this.powerups.push({ kind, x, y, t: 0, life: 6 });
+    this.powerups.push({ kind, x, y, t: 0, life: CONFIG.powerups.life });
   }
 
   collect(pu) {
@@ -381,8 +373,8 @@ export class Game {
     const def = POWERUPS[pu.kind];
     if (pu.kind === 'freeze') this.freezeT = this.mods.freezeTime;
     if (pu.kind === 'wall') this.wallT = this.mods.wallTime;
-    if (pu.kind === 'shield') this.shield = Math.min(MAX_SHIELD, this.shield + 1);
-    if (pu.kind === 'charge') this.sweep = Math.min(100, this.sweep + 40);
+    if (pu.kind === 'shield') this.shield = Math.min(CONFIG.powerups.maxShield, this.shield + 1);
+    if (pu.kind === 'charge') this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + CONFIG.powerups.chargeAmount);
     this.floater(this.sx(pu.x), this.sy(pu.y) - 24, tr(`pu.${pu.kind}`), def.color, 1.2);
     this.burst(pu.x, pu.y, def.color, 16);
     sfx.power();
@@ -460,8 +452,8 @@ export class Game {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
         this.warn(this.queue.shift());
-        if (this.wave >= 6 && this.queue.length && Math.random() < 0.2) this.warn(this.queue.shift());
-        this.spawnT = this.spawnInterval * rand(0.7, 1.3);
+        if (this.wave >= CONFIG.waves.doubleFromWave && this.queue.length && Math.random() < CONFIG.waves.doubleChance) this.warn(this.queue.shift());
+        this.spawnT = this.spawnInterval * rand(CONFIG.waves.jitterMin, CONFIG.waves.jitterMax);
       }
     } else if (!this.enemies.length && !this.warnings.length) {
       this.waveCleared();
@@ -479,7 +471,7 @@ export class Game {
 
     // intruders
     const frozen = this.freezeT > 0;
-    const slow = this.wallT > 0 ? 0.4 : 1;
+    const slow = this.wallT > 0 ? CONFIG.powerups.wallSlow : 1;
     for (const e of [...this.enemies]) {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
@@ -488,11 +480,11 @@ export class Game {
       const ty = e.phase === 0 ? e.ty : DHAKA[1];
       const dx = tx - e.x, dy = ty - e.y;
       const d = Math.hypot(dx, dy) || 1;
-      if (e.phase === 0 && d < 0.03) e.phase = 1;
+      if (e.phase === 0 && d < CONFIG.combat.phaseSwitchDistance) e.phase = 1;
       const spd = e.speed * slow;
       let vx = (dx / d) * spd, vy = (dy / d) * spd;
       if (e.def.wobble) {
-        const w = Math.sin(e.t * 5 + e.seed) * spd * 0.8;
+        const w = Math.sin(e.t * CONFIG.combat.wobbleFrequency + e.seed) * spd * CONFIG.combat.wobbleAmplitude;
         vx += (-dy / d) * w; vy += (dx / d) * w;
       }
       e.x += vx * dt; e.y += vy * dt;
@@ -500,11 +492,11 @@ export class Game {
       if (e.def.summons) {
         e.summonT -= dt;
         if (e.summonT <= 0) {
-          e.summonT = Math.max(1.8, e.def.summons.every - this.wave * 0.05);
+          e.summonT = Math.max(CONFIG.spawn.summonMinInterval, e.def.summons.every - this.wave * CONFIG.spawn.summonSpeedupPerWave);
           const kinds = e.def.summons.types;
           const a = Math.random() * Math.PI * 2;
           this.spawn(kinds[Math.floor(Math.random() * kinds.length)], {
-            x: e.x + Math.cos(a) * 0.15, y: e.y + Math.sin(a) * 0.15, tx: e.tx + rand(-0.15, 0.15), ty: e.ty + rand(-0.15, 0.15),
+            x: e.x + Math.cos(a) * CONFIG.spawn.summonSpread, y: e.y + Math.sin(a) * CONFIG.spawn.summonSpread, tx: e.tx + rand(-CONFIG.spawn.summonSpread, CONFIG.spawn.summonSpread), ty: e.ty + rand(-CONFIG.spawn.summonSpread, CONFIG.spawn.summonSpread),
           });
         }
       }
@@ -576,8 +568,8 @@ export class Game {
     ctx.restore();
 
     // border
-    const danger = this.enemies.some((e) => e.near < DANGER);
-    const mainDanger = this.enemies.some((e) => e.def.tier === 1 && e.near < DANGER * 2);
+    const danger = this.enemies.some((e) => e.near < CONFIG.combat.dangerDistance);
+    const mainDanger = this.enemies.some((e) => e.def.tier === 1 && e.near < CONFIG.combat.dangerDistance * 2);
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 1.5;
@@ -601,7 +593,7 @@ export class Game {
     // power-ups
     for (const pu of this.powerups) {
       const x = this.sx(pu.x), y = this.sy(pu.y);
-      const fade = pu.life - pu.t < 1.5 ? (Math.sin(t * 20) > 0 ? 1 : 0.3) : 1;
+      const fade = pu.life - pu.t < CONFIG.powerups.blinkTime ? (Math.sin(t * 20) > 0 ? 1 : 0.3) : 1;
       const r = 18 + Math.sin(t * 6) * 2;
       ctx.globalAlpha = fade;
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -696,7 +688,7 @@ export class Game {
     const { ctx } = this;
     const x = this.sx(w.p.x), y = this.sy(w.p.y);
     const main = CHARACTERS[w.type].tier === 1;
-    const k = 1 - w.t / WARN_TIME; // 0 → 1 as the spawn approaches
+    const k = 1 - w.t / CONFIG.spawn.warnTime; // 0 → 1 as the spawn approaches
     const color = main ? '255,215,0' : '255,90,106';
     const r = (main ? 34 : 22) * (1.4 - 0.6 * k);
     ctx.globalAlpha = 0.35 + 0.5 * k;
@@ -735,7 +727,7 @@ export class Game {
     if (e.def.stealth) alpha = 0.25 + 0.75 * Math.max(0, Math.sin(e.t * 2.2 + e.seed)) ** 2;
     ctx.globalAlpha = alpha;
 
-    if (e.near < DANGER) {
+    if (e.near < CONFIG.combat.dangerDistance) {
       ctx.strokeStyle = `rgba(255,60,80,${0.5 + 0.5 * Math.sin(t * 14)})`;
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
@@ -758,10 +750,11 @@ export class Game {
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.stroke();
 
-    if (e.def.img?.complete && e.def.img.naturalWidth) {
+    const sprite = getSprite(e.def, 'walk');
+    if (sprite) {
       ctx.save();
       ctx.beginPath(); ctx.arc(x, y + bob, r - 2, 0, Math.PI * 2); ctx.clip();
-      ctx.drawImage(e.def.img, x - r, y + bob - r, r * 2, r * 2);
+      ctx.drawImage(sprite, x - r, y + bob - r, r * 2, r * 2);
       ctx.restore();
     } else {
       ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;

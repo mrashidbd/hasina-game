@@ -1,8 +1,9 @@
 import { Game } from './game.js';
-import { CHARACTERS, POWERUPS, TIERS } from './characters.js';
+import { CHARACTERS, POWERUPS, TIERS } from './data/enemies.js';
 import { PERKS } from './perks.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
+import { preloadImages } from './assets.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -190,6 +191,7 @@ function applyLang() {
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
 
+preloadImages();
 applyLang();
 show('menu');
 

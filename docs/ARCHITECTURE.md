@@ -4,17 +4,33 @@ How the game is put together, for anyone changing the code. Rules and point valu
 as the player sees them are in `README.md`; this file is about the *implementation*.
 Line references are approximate — search for the function name.
 
+## Configuration
+All numbers that shape gameplay live in `CONFIG` (`js/config.js`), grouped as `layout`,
+`spawn`, `waves`, `scoring`, `input`, `combat`, `powerups`, `perks`, `kick`. Formulas below
+show the default values; the code reads them as `CONFIG.<group>.<key>`. `BASE_MODS` in
+`js/perks.js` copies the perk-adjustable ones at the start of each run.
+
+## Assets & sound
+- `js/assets.js`: `preloadImages()` (called once by main.js) creates an Image for every
+  non-null `sprites.*` path in `CHARACTERS` and `HEROES`; `getSprite(def, pose)` returns
+  it only once loaded (fallback pose → `walk` → `ready`), else `null` → emoji is drawn.
+- `js/audio.js`: `play(id, arg)` uses the decoded file from `SOUNDS[id].file` if loaded,
+  otherwise the synth function named by `SOUNDS[id].synth`. `preloadSounds()` runs after
+  the first user gesture (`unlockAudio`). `sfx.*` are thin wrappers around `play`.
+
 ## Module graph
 
 ```
 index.html ──loads──> js/main.js (UI glue)
                          ├── js/game.js (engine: Game class)
                          │      ├── js/map.js        (geometry + map data)
-                         │      ├── js/characters.js (roster/balance data)
+                         │      ├── js/config.js     (CONFIG: all tunables)
+                         │      ├── js/data/enemies.js (roster/balance data)
+                         │      ├── js/assets.js     (sprites → data/heroes.js)
                          │      ├── js/perks.js      (upgrades + BASE_MODS)
-                         │      ├── js/audio.js      (sfx)
+                         │      ├── js/audio.js      (sfx/play → data/sounds.js)
                          │      └── js/i18n.js       (t, fmt)
-                         ├── js/characters.js (to build how-to tables)
+                         ├── js/data/enemies.js (to build how-to tables)
                          ├── js/perks.js      (emoji/max for the upgrade screen)
                          ├── js/audio.js      (unlock, mute)
                          └── js/i18n.js       (language switch)
@@ -130,7 +146,7 @@ constants: `tapRadius` (× hit radius), `knockback` (× 0.035 push), `sweepGain`
 `perkOptions()` shuffles the perks that are under `max` and pass `available(game)`.
 
 ## Power-ups
-`POWERUPS` in characters.js holds emoji/colour only; effects are hard-coded in
+`POWERUPS` in `js/data/enemies.js` holds emoji/colour only; effects are hard-coded in
 `Game.collect()`: freeze → `freezeT = mods.freezeTime` (4), wall → `wallT = mods.wallTime` (7; speed × 0.4), shield →
 `+1` up to `MAX_SHIELD` (3; not dropped when full), charge → sweep `+40`. Power-ups
 live 6 s and blink in the last 1.5 s. Adding a power-up = entry in `POWERUPS` + branch

@@ -48,7 +48,11 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `css/style.css` | Styling, responsive, safe-area insets |
 | `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), share, keyboard, PWA install, SW registration, renders how-to tables from data |
 | `js/game.js` | `Game` class: waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
-| `js/characters.js` | **Roster + balance data**: `TIERS`, `CHARACTERS`, `POWERUPS`, `MAIN_ID`, `isMainWave` |
+| `js/config.js` | **`CONFIG`: every global tunable** (layout, spawn, waves, scoring, input, combat, power-ups, perks, kick) with units |
+| `js/data/enemies.js` | **Roster + per-character balance**: `TIERS`, `CHARACTERS` (stats, behaviours, `sprites`, `sound`), `POWERUPS`, `MAIN_ID`, `isMainWave` |
+| `js/data/heroes.js` | `HEROES`: the 4 self characters (sprites/sound; gameplay use comes in plan phase D) |
+| `js/data/sounds.js` | `SOUNDS`: sound id → optional `file` + `synth` fallback + volume |
+| `js/assets.js` | `preloadImages()`, `getSprite(def, pose)` (null → draw emoji) |
 | `js/perks.js` | Between-wave upgrades: `BASE_MODS` (per-run modifiers), `PERKS`, `perkOptions()` |
 | `js/map.js` | Bangladesh outline (lon/lat, edges tagged India/Myanmar/Coast), projection, sea/Myanmar polygons, geometry helpers |
 | `js/i18n.js` | `en` / `bn` strings, `t(key, vars)`, `fmt(n)` (Bangla digits), language detection |
@@ -61,19 +65,35 @@ Application → "Update on reload", otherwise you may see the cached old version
 2. **Every user-visible string goes in `js/i18n.js` in BOTH `en` and `bn`.** Use
    `t('key')` in JS or `data-i18n="key"` in HTML. Numbers shown to players go through
    `fmt()` (or pass numbers as `t()` vars, which are auto-formatted).
-3. **Balance lives in data, not code.** Character stats → `js/characters.js`. Global
-   tuning constants → top of `js/game.js`. Values a perk can change → `BASE_MODS` in
+3. **Balance lives in data, not code.** Character stats → `js/data/enemies.js`. Global
+   tunables → `CONFIG` in `js/config.js` (never add magic numbers to `game.js`; rendering-only
+   pixel/colour values are the exception). Values a perk can change → `BASE_MODS` in
    `js/perks.js` (read via `game.mods.*`, never a constant). Wave formulas → `Game.nextWave()`.
 4. **New character** = add entry in `CHARACTERS` + `char.<id>` and `trait.<id>` in both
    languages. The how-to roster table and wave mix pick it up automatically.
    **New perk** = entry in `PERKS` + `perkName.<id>` / `perkDesc.<id>` in both languages.
-5. **New asset file** (sprite, sound, etc.) → add it to `ASSETS` in `sw.js`.
+5. **Assets**: set the path in data (`sprites.<pose>` in `js/data/*.js`, `file` in
+   `js/data/sounds.js`). Null/missing files fall back to emoji / synth, never throw.
+   Art goes in `assets/enemies/<id>/`, `assets/heroes/<id>/`, sounds in `assets/sfx/…`
+   (names per `docs/prompts/`). The SW caches them at runtime; new **JS** files must be
+   added to `ASSETS` in `sw.js`.
 6. **Any shipped change → bump `VERSION` in `sw.js`** (e.g. `kto-v3` → `kto-v4`), or
    installed players keep the old cached build.
 7. Keep README's rule/point tables in sync with the code when balance changes
    (README is what players/maintainers read; it currently matches the code).
 8. Style: 2-space indent, single quotes, semicolons, small focused functions, short
    comments explaining *why*.
+
+## Team workflow (since 2026-11-09)
+The user's rule: **Claude is code inspector + project manager.** Bulk/initial coding is
+delegated, then Claude reviews diffs in detail, runs tests, fixes small issues itself and
+sends larger corrections back to the tools.
+- `opencode run -m opencode/crouton-alpha-free --auto "<brief>"` (unlimited; default choice)
+- `agy -p "<brief>" --model claude-opus-4-6-thinking --mode accept-edits`; when its limit
+  is reached use `--model gemini-3.8-flash-high`
+- Briefs: precise file list, exact values, "don't" list (no docs edits, no commits, no
+  deps), and "done when" checks. Keep briefs in the session scratchpad, not the repo.
+- Current roadmap: `docs/PLAN-v2.md`. Art/sound prompts for the user: `docs/prompts/`.
 
 ## Documentation upkeep (mandatory)
 These docs exist so the next agent can pick up context fast. When you change the
