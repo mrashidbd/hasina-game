@@ -5,8 +5,9 @@ left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.
 
 ## 2026-11-09 — Branch setup
 - Pushed docs + gameplay pass 1, then created `main` from the same commit.
-- Enabled GitHub Pages (source: GitHub Actions). The deploy from `main` is still rejected by
-  the `github-pages` environment's branch rule (only the default branch is allowed); see TODO.
+- Enabled GitHub Pages (source: GitHub Actions); user allowed `main` in the `github-pages`
+  environment. First successful deploy (run 42612965148): https://mrashidbd.github.io/hasina-game/
+  — checked live in headless Chromium at phone size: game starts, service worker active, no errors.
 
 ## 2026-11-05 — Gameplay pass 1
 - **Spawn warnings**: each wave spawn is telegraphed 0.7 s ahead by a flashing marker

@@ -6,11 +6,9 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 ## Repo / deploy
 - [x] `main` branch created and pushed (2026-11-09).
 - [x] GitHub Pages enabled with source "GitHub Actions" (2026-11-09).
-- [ ] Allow `main` to deploy: the `github-pages` environment only allows
-      `claude/modest-bohr-vzpqz0` (Settings → Environments → github-pages → Deployment
-      branches → add `main`), or make `main` the default branch. Then re-run the
-      "Deploy to GitHub Pages" workflow (run 42612291203).
-- [ ] Optionally retire `claude/modest-bohr-vzpqz0` once `main` is the default.
+- [x] `main` allowed to deploy; site live at https://mrashidbd.github.io/hasina-game/ (2026-11-09).
+- [ ] Make `main` the repo's default branch (still `claude/modest-bohr-vzpqz0`) and then
+      retire the old branch. Note the old branch can no longer deploy to Pages.
 
 ## Known issues / rough edges (found in code review, 2026-11-05)
 - [ ] Power-up descriptions in the how-to ("Freezes everyone for 4s") show base values,
