@@ -87,8 +87,12 @@ project, update the docs **in the same change**:
 
 ## Repo / git state
 - Remote: `https://github.com/mrashidbd/hasina-game.git`
-- As of 2026-11-05 the only remote branch is `claude/modest-bohr-vzpqz0`; **there is no
-  `main` branch yet**, so the Pages workflow (which triggers on `main`) has never run.
-  Ask the user before creating/pushing `main`.
+- Branches: `main` (created 2026-11-09; pushes deploy via the Pages workflow) and
+  `claude/modest-bohr-vzpqz0` (original working branch, same commits as of 2026-11-09).
+  The GitHub *default* branch is still `claude/modest-bohr-vzpqz0`.
+- GitHub Pages was **not enabled** as of 2026-11-09, so the first `main` deploy run
+  failed at `configure-pages`. Needs Settings → Pages → Source: GitHub Actions (user).
+- Push as the `mrashidbd` GitHub account (`gh auth switch`); the other local account
+  `zuviarbd` has no write access.
 - Content note: this is a political satire / fan game. Character names other than the
   tier-1 target are intentional placeholders; the user will decide the real roster.

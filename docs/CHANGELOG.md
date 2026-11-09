@@ -3,6 +3,10 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-09 — Branch setup
+- Pushed docs + gameplay pass 1, then created `main` from the same commit.
+- Pages deploy on `main` failed because GitHub Pages isn't enabled on the repo yet (see TODO).
+
 ## 2026-11-05 — Gameplay pass 1
 - **Spawn warnings**: each wave spawn is telegraphed 0.7 s ahead by a flashing marker
   (gold 👑 for Hasina) so spawns near the border are fair and readable.
