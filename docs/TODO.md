@@ -5,9 +5,12 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 
 ## Repo / deploy
 - [x] `main` branch created and pushed (2026-11-09).
-- [ ] Enable GitHub Pages (Settings → Pages → Source: GitHub Actions), then re-run the
-      "Deploy to GitHub Pages" workflow. The first run on `main` failed because Pages is off.
-- [ ] Optionally make `main` the repo's default branch and retire `claude/modest-bohr-vzpqz0`.
+- [x] GitHub Pages enabled with source "GitHub Actions" (2026-11-09).
+- [ ] Allow `main` to deploy: the `github-pages` environment only allows
+      `claude/modest-bohr-vzpqz0` (Settings → Environments → github-pages → Deployment
+      branches → add `main`), or make `main` the default branch. Then re-run the
+      "Deploy to GitHub Pages" workflow (run 42612291203).
+- [ ] Optionally retire `claude/modest-bohr-vzpqz0` once `main` is the default.
 
 ## Known issues / rough edges (found in code review, 2026-11-05)
 - [ ] Power-up descriptions in the how-to ("Freezes everyone for 4s") show base values,

@@ -90,8 +90,10 @@ project, update the docs **in the same change**:
 - Branches: `main` (created 2026-11-09; pushes deploy via the Pages workflow) and
   `claude/modest-bohr-vzpqz0` (original working branch, same commits as of 2026-11-09).
   The GitHub *default* branch is still `claude/modest-bohr-vzpqz0`.
-- GitHub Pages was **not enabled** as of 2026-11-09, so the first `main` deploy run
-  failed at `configure-pages`. Needs Settings → Pages → Source: GitHub Actions (user).
+- GitHub Pages is enabled (source: GitHub Actions, URL https://mrashidbd.github.io/hasina-game/).
+  As of 2026-11-09 deploys from `main` are still **rejected**: the `github-pages`
+  environment only allows the default branch `claude/modest-bohr-vzpqz0`. Fix (user):
+  Settings → Environments → github-pages → add `main`, or make `main` the default branch.
 - Push as the `mrashidbd` GitHub account (`gh auth switch`); the other local account
   `zuviarbd` has no write access.
 - Content note: this is a political satire / fan game. Character names other than the
