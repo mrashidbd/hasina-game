@@ -3,6 +3,10 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-09 — v2 live
+- `v2` (phases A–E) fast-forwarded into `main` and deployed to GitHub Pages (SW `kto-v8`).
+  Art and sound files are still missing, so the live game shows emoji and synth sounds.
+
 ## 2026-11-09 — v2 phase E: real roster (branch `v2`)
 - 17 real characters replace the placeholders (Hasina; Quader, Nanok, Taposh, Samim Osman,
   Arafat; Siddique Nazmul, Zakir, Momotaz, Inan, Shohag, Saddam, Murad, Ferdous, Mahiya Mahi,

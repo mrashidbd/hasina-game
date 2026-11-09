@@ -120,8 +120,8 @@ project, update the docs **in the same change**:
 
 ## Repo / git state
 - Remote: `https://github.com/mrashidbd/hasina-game.git`
-- Branches: `main` (created 2026-11-09; pushes deploy via the Pages workflow) and
-  `claude/modest-bohr-vzpqz0` (original working branch, same commits as of 2026-11-09).
+- Branches: `main` (live; pushes deploy via the Pages workflow), `v2` (v2 work branch,
+  merged into `main` 2026-11-09) and `claude/modest-bohr-vzpqz0` (original branch, stale).
   The GitHub *default* branch is still `claude/modest-bohr-vzpqz0`.
 - **Live site: https://mrashidbd.github.io/hasina-game/** — every push to `main` deploys
   (GitHub Pages, source: GitHub Actions; the `github-pages` environment allows `main` only).
