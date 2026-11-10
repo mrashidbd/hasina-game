@@ -84,6 +84,7 @@ h1 { margin: 4px 0 0; font-size: clamp(32px, 9vw, 44px); font-weight: 900; lette
   background: linear-gradient(180deg, #fff, var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 h2 { margin: 0 0 4px; font-size: 28px; text-align: center; }
 h2.bad { color: #ff5a6a; }
+h2.good { color: #ffe15a; }
 h3 { margin: 10px 0 2px; font-size: 16px; color: var(--mint); }
 h3 small { color: var(--ink); opacity: .6; font-weight: 400; }
 .tag { margin: 0 0 6px; opacity: .85; line-height: 1.4; }

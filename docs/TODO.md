@@ -32,7 +32,10 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).
 
 ## Rope 'Em! mode (branch `lasso`)
-- [ ] Play-test balance on a phone: rope range, lap time, lurk times, tug numbers, round target.
+- [ ] Play-test v2 balance on a phone: sneak interval/speed, lurker speeds, Hasina pull
+      (`mainPullMul`), `mainAfterLocked`, level pace.
+- [ ] On narrow portrait phones little Indian land is on screen, so lurkers crowd the left
+      and right edges; consider a lurk band that hugs the border more tightly there.
 - [ ] Not live yet: merge `lasso` into `main` when the user approves.
 - [ ] Rope sounds (throw whoosh, loop tighten, snap) are not in `docs/prompts/sound-design.md`
       yet; the mode reuses `tap`, `hit` and `leak`.

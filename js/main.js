@@ -30,7 +30,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ----- HUD
-const hud = { timer: $('timer'), target: $('target'), score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
+const hud = { locked: $('locked'), lives: $('lives'), score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
 const lastHud = {};
 function setText(el, key, v) { if (lastHud[key] !== v) { lastHud[key] = v; el.textContent = v; } }
 function onHud(g) {
@@ -42,8 +42,8 @@ function onHud(g) {
   if (lastHud.comboBar !== left) { lastHud.comboBar = left; hud.comboBar.style.width = left; }
   setText(hud.shield, 'shield', '🛡️'.repeat(g.shield));
   if (g instanceof LassoGame) {
-    setText(hud.timer, 'timer', fmt(Math.ceil(g.roundT)));
-    setText(hud.target, 'target', `${fmt(g.caughtRound)}/${fmt(g.target)}`);
+    setText(hud.locked, 'locked', fmt(g.locked));
+    setText(hud.lives, 'lives', '❤️'.repeat(g.lives) + '🖤'.repeat(g.maxLives - g.lives));
   }
   const pct = `${g.sweep}%`;
   if (lastHud.sweep !== pct) { lastHud.sweep = pct; hud.sweepFill.style.width = pct; }
@@ -116,17 +116,22 @@ let lastBest = 0;
 function renderOver() {
   const s = lastResult;
   if (!s) return;
+  const title = $('overTitle');
+  title.classList.remove('good', 'bad');
   const who = s.intruderType ? t(`char.${s.intruderType}`) : '';
   if (s.mode === 'lasso') {
-    $('overReason').textContent = s.reason === 'escape'
-      ? t('lOverEscape', { who, n: s.round })
-      : t('lOverTarget', { n: s.caughtRound, target: s.target, round: s.round });
+    title.textContent = s.won ? t('lWinTitle') : t('lLostTitle');
+    title.classList.add(s.won ? 'good' : 'bad');
+    $('overReason').textContent = s.won ? t('lWinReason', { time: s.time }) : t('lOverSneak');
     $('overStats').innerHTML = [
-      ['sRound', fmt(s.round)], ['sCaught', fmt(s.caught)], ['sEscaped', fmt(s.escaped)], ['sCombo', fmt(s.bestCombo)],
-      ['sAcc', `${fmt(s.accuracy)}%`], ['sMain', fmt(s.mains)], ['sLost', fmt(s.lost)], ['sBest', fmt(lastBest)],
+      ['sLevel', fmt(s.level)], ['sLocked', fmt(s.locked)],
+      ['sLives', '❤️'.repeat(s.lives) || fmt(0)], ['sCombo', fmt(s.bestCombo)],
+      ['sAcc', `${fmt(s.accuracy)}%`], ['sBest', fmt(lastBest)],
     ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
     return;
   }
+  title.textContent = t('breached');
+  title.classList.add('bad');
   $('overReason').textContent = t('breachReason', { who, wave: s.wave });
   $('overStats').innerHTML = [
     ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
@@ -161,7 +166,7 @@ function setMode(m) {
   mode = m;
   store.set('kto-mode', m);
   document.body.dataset.mode = m;
-  $('waveLbl').dataset.i18n = m === 'lasso' ? 'hudRound' : 'hudWave';
+  $('waveLbl').dataset.i18n = m === 'lasso' ? 'hudLevel' : 'hudWave';
   $('waveLbl').textContent = t($('waveLbl').dataset.i18n);
   for (const k of Object.keys(lastHud)) delete lastHud[k];
 }
@@ -239,7 +244,9 @@ syncMute();
 $('shareBtn').onclick = async () => {
   const s = lastResult;
   const text = s?.mode === 'lasso'
-    ? t('lShareText', { round: s.round, score: s.score })
+    ? (s.won
+      ? t('lShareWin', { score: s.score, time: s.time })
+      : t('lShareText', { level: s.level, score: s.score }))
     : t('shareText', { wave: s?.wave ?? 1, score: s?.score ?? 0 });
   const url = location.href.split('#')[0];
   try {

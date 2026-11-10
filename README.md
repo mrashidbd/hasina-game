@@ -126,29 +126,34 @@ and how many points that cost.
 
 ## Rope 'Em! mode 🪢
 A second mode, picked on the menu (code: `js/lasso.js`, numbers: `CONFIG.lasso`, design:
-`docs/PLAN-lasso.md`). Same characters, heroes, art and sounds.
+`docs/PLAN-lasso.md`). It uses the same characters, heroes, art and sounds.
 
-- The crooks are already **inside** Bangladesh and lurk around. After 6–12 s each one runs
-  for the **India border**; crossing it means it escaped.
-- Your hero **patrols a loop along the border** on its own. ⇄ (or <kbd>R</kbd>) reverses it.
-- **Tap to throw the rope** toward that spot. Its reach is 1.7 map units (~170 km); the faint ring shows it.
-  The loop catches whoever is inside it when it lands. Stealthy ones can't be roped while faded,
-  and Taposh may hop out of the loop.
-- 1-kick characters are pulled in at once. Tougher ones fill a **tug meter**: tap fast to
-  fill it; if it empties, the rope snaps and they dash off.
-- **Rounds** last 60 s with a target of `5 + 2 × round` catches. Miss the target → game over.
-- **Hasina** is rare: a 35% chance per round from round 2, guaranteed every 4th round. She is the fastest and pulls
-  hardest. If she escapes it's game over (a 🛡️ shield drags her back once). Catching her = 1000
-  points and counts as 5 catches.
+- The crooks **lurk outside Bangladesh** on Indian land. Tier 2 and Hasina move fast and
+  erratically.
+- Your hero **circles the jail at Dhaka**; ⇄ (or <kbd>R</kbd>) reverses the direction.
+- **Tap a crook (or a spot)**:
+  - within reach (3 map units ≈ 300 km, the faint ring) the rope flies at once and homes in
+    on the crook;
+  - out of reach, the hero runs over until it is in reach, throws, then goes back to
+    circling.
+- Stealthy crooks can't be roped while faded, and Taposh may hop out of the loop.
+- 1-kick crooks are pulled in at once. Tougher ones fill a **tug meter** while you tap fast;
+  if it empties, the rope snaps.
+- Caught crooks are **flung into the jail**. Every 6 lockups is a level-up: more crooks,
+  faster crooks, more sneaking.
+- Every few seconds one crook **sneaks in** and runs for Dhaka. 3 that get in = game over
+  (a 🛡️ shield blocks one).
+- **Hasina** appears after 12 lockups. She is the fastest and pulls hardest, and slips away
+  after 30 s if not caught (then comes back). **Locking her up wins the game.**
 
 | Source | Points |
 |---|---|
-| Catch | Base points × combo multiplier (Hasina 1000 × multiplier) |
-| Round target reached | **+100 × round** |
-| Time bonus | **+10** per second left when the target was reached |
-| Senior / small leader escapes | **−200** / **−50** |
+| Lockup | Base points × combo multiplier (Hasina 1000 × multiplier) |
+| Win | **+500** per ❤️ left |
+| A crook gets in | −1 ❤️ (no points lost) |
 
-Power-ups: ❄️ Freeze, 🧱 Border Wall, 🛡️ Shield (no Charge, no Sweep, no upgrades in this mode).
+Power-ups: ❄️ Freeze (also stops sneakers), 🧱 Border Wall (slows everyone), 🛡️ Shield. This
+mode has no Charge, no Sweep and no upgrades.
 
 ## Power-ups
 Any catch has a 7% chance to drop one, and Hasina always drops one. Tap a power-up to collect it.

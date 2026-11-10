@@ -3,7 +3,37 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
-## 2026-11-10 — "Rope 'Em!" mode (branch `lasso`)
+## 2026-11-10 — Rope 'Em! redesign v2 (branch `lasso`)
+- After playing v1, the user changed the concept:
+  - crooks lurk **outside** Bangladesh (on Indian land, fast and erratic for tier 2 and
+    Hasina);
+  - the hero **circles the jail at Dhaka** and chases out-of-reach targets;
+  - caught crooks are **flung into the jail**;
+  - **sneak-ins** cost ❤️ (3 = game over);
+  - **locking up Hasina wins**.
+  Rounds, the timer, the border patrol and escapes to India are gone.
+- Coded by opencode with **GLM-5.3** (`zai-coding-plan/glm-5.3`, the user's Z.AI plan) from
+  a brief, then reviewed by Claude.
+- Claude's fixes:
+  - Hasina's pull eased (`mainPullMul` 1.2 → 1.0, about 3.3 taps/s to hold her);
+  - start banner;
+  - a Bangla typo in the win share text;
+  - "0" shown when no ❤️ are left;
+  - a bigger jail with fewer bars so the faces read;
+  - shorter HUD label ("JAILED").
+- Tested headless (desktop + phone):
+  - lurkers stay outside;
+  - in-reach catch and lockup;
+  - chase of a 4.7-unit target and return to the orbit;
+  - sneak-in costs a ❤️;
+  - level-up;
+  - Hasina slips away;
+  - Hasina reeled in → "YOU WIN!" screen;
+  - 3 sneak-ins → "OVERRUN!";
+  - classic still shows "BORDER BREACHED!".
+- SW `kto-v10`. Not pushed (user's request).
+
+## 2026-11-10 — "Rope 'Em!" mode v1 (branch `lasso`)
 - New second mode picked on the menu: crooks lurk inside Bangladesh and bolt for India; the
   hero patrols the border and throws a rope; tough ones are reeled in by tapping fast. Timed
   rounds with a catch target; Hasina is rare and fast, and her escape ends the run. Design:

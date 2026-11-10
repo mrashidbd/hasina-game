@@ -217,32 +217,40 @@ constants: `tapRadius` (× hit radius), `knockback` (× 0.035 push), `sweepGain`
 live 6 s and blink in the last 1.5 s. Adding a power-up = entry in `POWERUPS` + branch
 in `collect()` + `pu.*`, `puName.*`, `puDesc.*` strings.
 
-## Rope 'Em! mode (`js/lasso.js`)
-Tunables: `CONFIG.lasso`. `wave` is the **round** number.
-- **Patrol loop** `PATROL` (module level): the BD mainland resampled to `pathPoints`, pushed
-  `pathInset` inside along each edge normal, smoothed (`pathSmooth`). The hero has an arc
-  position `heroS` and direction `heroDir` (`reverse()`, ⇄ button / `R`), runs one lap per
-  `heroLapTime`, and stands still while `rope` is not null.
-- **Rounds**: `nextWave()` sets `target`, `roundT`, the spawn rate and `speedMul`, and maybe
-  schedules Hasina (`mainAt`). `endRound()` at time 0 → bonus + `breakTime` break, or
-  `gameOver('target')`. `targetLeft` = time left when the target was reached (time bonus).
-- **Characters**: spawned at random points inside BD (via `warn()` → `spawnPoint()`), up to
-  a cap. `state`: `lurk` (random waypoints, never leaves BD) → `bolt` (to the nearest India
-  border point + overshoot) → escape when outside BD (`breach`: penalty, or game over /
-  shield for Hasina). `roped` while on the rope; `dash` after the rope snaps. `near` is
-  only set while bolting/dashing (danger ring, border glow). Hasina uses `mainSpeed`.
-- **Rope** `{ phase: 'out' | 'back' | 'reel', x, y, tx, ty, target, cx, cy, auto, tug, autoT }`
-  in map units. `out` flies at `ropeSpeed` to the tap (clamped to `ropeRange`), `landLoop()`
-  picks the nearest catchable character within `loopRadius` (stealth alpha ≥ 0.5; dodgers
-  may hop out). 1-HP characters auto-reel (`autoReelTime`); others have a tug meter that
-  taps raise (`reelPerTap / strength`) and the character lowers (`pullBase × strength`/s),
-  with strength = `hp^strengthExp` (× `mainPullMul` for Hasina). Meter ≥ 1 → `ropeCatch()`;
-  ≤ 0 → `snap()`.
-- **Scoring**: points × combo multiplier (Hasina `mainPoints`), `roundBonus × round` +
-  `timeBonusPerSec × targetLeft`. Escapes cost the tier penalty (`stats.leaked` = escaped).
-- Drawing (`drawLayer`): dashed patrol loop, rope (quadratic curve with sag) and loop
-  ellipse, tug meter + "TAP TAP!", the hero (sprite poses `run`/`throw`/`pull`/`cheer`
-  if present in the manifest, else `ready`/`kick`; emoji disc fallback), range ring.
+## Rope 'Em! mode (`js/lasso.js`) — design v2
+Tunables: `CONFIG.lasso`; rules in `docs/PLAN-lasso.md`. `wave` mirrors `level`.
+- **Lurkers** live outside Bangladesh: `lurkPoint(near, maxDist)` / `lurkOK(x, y)`. A lurk
+  point is on Indian land, not in BD, `lurkMin..MaxBorderDist` from the border and on
+  screen. `state: 'lurk'` wanders between waypoints with a per-tier turn timer
+  (`turnTier3/2/Main`); speed comes from `lurkSpeed(def)` (tier 2 and Hasina are fast).
+  Spawns go through `warn()` → `spawnPoint()`, up to a level-based cap.
+- **Sneaking**: `sneakT` → `startSneak()` turns one tier 2/3 lurker into `state: 'sneak'`,
+  which runs straight to DHAKA (`near = 0` → red ring + red border). Within `gotInRadius`
+  → `gotIn()`: a shield throws it back, otherwise `lives--`; 0 lives → `gameOver('sneak')`.
+- **Hero**: `hx, hy` (map units), `heroState: 'orbit' | 'chase' | 'return'`, `heroA` /
+  `heroDir` (orbit around DHAKA at `orbitRadius`; `reverse()`), `chaseTarget` (a crook or
+  a point). `onPointer`: in `ropeRange` → `throwRope(target)`, else chase until in reach,
+  then throw. The hero stands still while `rope` is set, and returns to the orbit
+  afterwards.
+- **Rope** `{ phase: 'out' | 'back' | 'reel', x, y, tx, ty, target, cx, cy, auto, tug, autoT }`:
+  - homing toward a tapped crook while `out`;
+  - `landLoop()` (stealth / dodge / miss);
+  - reel: auto for 1 HP, else a tug meter (`reelPerTap / strength`, `pullBase × strength`/s,
+    strength = `hp^strengthExp` × `mainPullMul`);
+  - `snap()` → `state: 'dash'`, then lurk.
+- **Lockup**: `lockUp(e)` scores the catch (combo) and pushes a yank; `updateYanks()` lands
+  it in `jail` (types) after `yankTime`, `locked++`, and levels up every `levelEvery`. A
+  Hasina landing → `win()` (bonus `winBonusPerLife × lives`, confetti, `won = true`, the
+  game-over screen in "YOU WIN!" style).
+- **Hasina**: scheduled (`mainAt`) once `locked ≥ mainAfterLocked` and the cooldown is over.
+  She never sneaks; after `mainStay` s unroped → `mainSlip()` (fades away, `mainCooldown`).
+  `drawBossBar` shows her time left or the reel progress.
+- **Drawing** (`drawLayer`): `drawJail()` (stone box at DHAKA, the last 8 prisoners' faces,
+  bars, 🔒 count, shake), the orbit circle, red sneak lines, `drawYanks()` (spinning arc
+  into the jail), rope / loop / tug meter, the chase line, the hero, and the range ring.
+- **Summary**: `{ mode: 'lasso', won, level, locked, lives, reason, time, wave: level }`.
+  main.js shows `#overTitle` as `lWinTitle` (class `good`) or `lLostTitle` (`bad`), and
+  resets it to `breached` for classic.
 
 ## Rendering order (`render()`)
 India background → Myanmar → sea gradient → labels → Bangladesh fill + red flag disc

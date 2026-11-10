@@ -25,8 +25,8 @@
   <header id="hud" class="hidden">
     <div class="stat"><small data-i18n="hudScore">SCORE</small><b id="score">0</b></div>
     <div class="stat"><small id="waveLbl" data-i18n="hudWave">WAVE</small><b id="wave">1</b></div>
-    <div class="stat lassoOnly"><small data-i18n="hudTime">TIME</small><b id="timer">60</b></div>
-    <div class="stat lassoOnly"><small data-i18n="hudCaught">CAUGHT</small><b id="target">0/7</b></div>
+    <div class="stat lassoOnly"><small data-i18n="hudLocked">JAILED</small><b id="locked">0</b></div>
+    <div class="stat lassoOnly"><small data-i18n="hudLives">LIVES</small><b id="lives">❤️❤️❤️</b></div>
     <div class="mid"><span id="combo"></span><i id="comboBar"></i><span id="shield"></span></div>
     <button id="dirBtn" class="icon lassoOnly" aria-label="Reverse direction">⇄</button>
     <button id="muteBtn" class="icon" aria-label="Toggle sound">🔊</button>
@@ -102,7 +102,7 @@
   <!-- Game over -->
   <section id="over" class="screen hidden">
     <div class="panel">
-      <h2 class="bad" data-i18n="breached">BORDER BREACHED!</h2>
+      <h2 id="overTitle" class="bad" data-i18n="breached">BORDER BREACHED!</h2>
       <p id="overReason" class="tag"></p>
       <div class="bigscore" id="overScore">0</div>
       <div id="overRecord" class="record hidden" data-i18n="record">🏆 NEW RECORD!</div>

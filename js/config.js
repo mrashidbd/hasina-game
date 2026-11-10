@@ -125,54 +125,51 @@ export const CONFIG = {
   },
   // "Rope 'Em!" mode (js/lasso.js). Map units: 1 ≈ 100 km. See docs/PLAN-lasso.md.
   lasso: {
-    roundTime: 60, // s, length of a round
-    breakTime: 2.2, // s, pause between rounds
-    targetBase: 5, // catches, round target = targetBase + targetPerRound × round
-    targetPerRound: 2, // catches per round
-    mainCountsAs: 5, // catches, a Hasina catch counts this much toward the target
-    unlockPerRound: 1.5, // classic waves per round, for `unlock` and pool weights
-    maxOnMapBase: 4, // count, characters on the map at once (round 1)
-    maxOnMapPerRound: 0.6, // count added per round
-    maxOnMapCap: 12, // count, hard cap
-    firstSpawnDelay: 0.6, // s
-    spawnEvery: 1.6, // s between spawns (round 1)
-    spawnSpeedup: 0.92, // factor per round
-    spawnEveryMin: 0.6, // s
-    spawnHeroGap: 0.6, // map units, spawns keep this far from the hero
-    speedMul: 0.55, // × character speed (classic speeds are for a sprint)
-    speedPerRound: 0.06, // speed bonus per round
-    lurkMin: 6, lurkMax: 12, // s wandering before bolting for the border (tier 3)
-    lurkTier2Mul: 0.85, // × lurk time for tier 2
-    mainLurkMul: 0.5, // × lurk time for Hasina
-    boltSpeedMul: 1.6, // × speed while bolting for the border
-    boltOvershoot: 0.4, // map units past the border they aim for
-    waypointMinDist: 0.6, // map units between lurk waypoints
-    mainSpeed: 0.26, // map units/s, Hasina's base speed (the fastest on the map)
-    mainFromRound: 2, // round, Hasina can appear from this round
-    mainChance: 0.35, // chance per round (at most once per round)
-    mainEveryRound: 4, // Hasina is guaranteed every Nth round
-    mainPoints: 1000, // points for catching Hasina
-    pathPoints: 320, // count, samples on the hero's patrol loop
-    pathInset: 0.12, // map units the patrol loop sits inside the border
-    pathSmooth: 9, // samples, moving-average window that smooths the loop
-    heroLapTime: 16, // s for one full lap
-    heroSizePx: 56, // px, hero size
-    cheerTime: 0.6, // s, cheer pose after a catch
-    ropeRange: 1.7, // map units, max throw distance
-    ropeSpeed: 7, // map units/s, loop flight speed (out and back)
-    loopRadius: 0.28, // map units, catch radius of the loop
-    dodgeChance: 0.5, // chance a dodger jumps out of an incoming loop
-    dodgeDist: 0.35, // map units, dodge jump
-    autoReelTime: 0.45, // s to pull in a 1-HP character
-    reelStart: 0.35, // tug meter start value (0..1)
-    reelPerTap: 0.2, // tug gain per tap ÷ strength
-    pullBase: 0.1, // tug loss per s × strength
-    strengthExp: 0.35, // strength = hp ^ strengthExp
-    mainPullMul: 1.2, // × Hasina's pull
-    breakDashTime: 0.6, // s a character dashes away after the rope snaps
-    breakDashMul: 3, // × speed while dashing away
-    roundBonus: 100, // points × round for reaching the target
-    timeBonusPerSec: 10, // points per second left when the target was reached
-    powerups: ['freeze', 'wall', 'shield'], // kinds that can drop in this mode
+    // hero
+    orbitRadius: 0.55,     // map units, hero circles Dhaka at this radius
+    orbitLapTime: 10,      // s per lap
+    heroRunSpeed: 1.8,     // map units/s while chasing / returning
+    heroSizePx: 56,        // px
+    cheerTime: 0.6,        // s
+    // rope
+    ropeRange: 3.0,        // map units (covers Bangladesh from the orbit)
+    ropeSpeed: 8,          // map units/s
+    loopRadius: 0.3,       // map units
+    homing: true,          // loop follows a tapped crook while flying
+    dodgeChance: 0.5, dodgeDist: 0.35,
+    autoReelTime: 0.45, reelStart: 0.35, reelPerTap: 0.2, pullBase: 0.1,
+    strengthExp: 0.35, mainPullMul: 1.0, // Hasina needs ~3.3 taps/s just to hold her
+    breakDashTime: 0.6, breakDashMul: 3,
+    yankTime: 0.7,         // s, flight into the jail
+    yankArcPx: 90,         // px, height of the flight arc
+    // lurkers (outside Bangladesh, on Indian land, on screen)
+    lurkMinBorderDist: 0.15, lurkMaxBorderDist: 2.2, // map units from the BD border
+    lurkSpeedMul: 0.6,      // tier 3: × def.speed
+    fastSpeedMul: 1.6,      // tier 2: × def.speed
+    mainSpeed: 0.45,        // map units/s, Hasina (the fastest)
+    turnTier3: [2, 4],      // s between new waypoints (random in range)
+    turnTier2: [0.5, 1.2],
+    turnMain: [0.35, 0.8],
+    waypointMaxDist: 1.2,   // map units, next waypoint within this distance
+    // population / levels
+    levelEvery: 6,          // lockups per level
+    unlockPerLevel: 1.5,    // classic waves per level (for `unlock` and pool weights)
+    maxOnMapBase: 5, maxOnMapPerLevel: 1, maxOnMapCap: 14,
+    firstSpawnDelay: 0.6,
+    spawnEvery: 1.4, spawnSpeedup: 0.92, spawnEveryMin: 0.5, // s, × per level
+    speedPerLevel: 0.05,
+    // sneaking in
+    sneakEvery: 9, sneakSpeedup: 0.88, sneakEveryMin: 3.5, // s, × per level
+    sneakSpeed: 0.22, sneakSpeedPerLevel: 0.02,             // map units/s
+    gotInRadius: 0.3,       // map units from Dhaka = got in
+    lives: 3,
+    // Hasina
+    mainAfterLocked: 12,    // lockups before she can appear
+    mainDelay: [4, 12],     // s random delay before she appears
+    mainStay: 30,           // s on the map before she slips away
+    mainCooldown: 20,       // s before she comes back
+    mainPoints: 1000,
+    winBonusPerLife: 500,
+    powerups: ['freeze', 'wall', 'shield'],
   },
 };
