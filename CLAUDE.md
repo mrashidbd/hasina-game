@@ -34,6 +34,8 @@ for f in js/*.js sw.js; do node --check "$f"; done
 In the browser console, `window.__game` is the live `Game` instance (e.g.
 `__game.sweep = 100`, `__game.shield = 3`, `__game.wave = 11; __game.nextWave()`,
 `__game.spawn('hasina')`, `__game.wave = 4; __game.waveCleared()` → upgrade screen).
+`__game` is the game of the active mode; in Rope 'Em! mode try `__game.roundT = 1` (end the
+round), `__game.caughtRound = __game.target`, `__game.throwRope(x, y)` (map units).
 If the Chrome extension isn't available, a headless Chromium from the Playwright cache
 (`~/.cache/ms-playwright/chromium_headless_shell-*`) driven over CDP with Node's built-in
 `WebSocket` works for screenshots and `Runtime.evaluate` checks (no npm install needed).
@@ -47,7 +49,8 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `index.html` | All screens (menu, how-to, pause, game over), HUD, sweep button. Static text uses `data-i18n="key"` |
 | `css/style.css` | Styling, responsive, safe-area insets |
 | `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), share, keyboard, PWA install, SW registration, renders how-to tables from data |
-| `js/game.js` | `Game` class: waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
+| `js/game.js` | `Game` class (classic mode): waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
+| `js/lasso.js` | `LassoGame extends Game`: the "Rope 'Em!" mode (patrol loop, rope, rounds). Tunables `CONFIG.lasso`; design `docs/PLAN-lasso.md` |
 | `js/config.js` | **`CONFIG`: every global tunable** (layout, spawn, waves, scoring, input, combat, power-ups, perks, kick) with units |
 | `js/data/enemies.js` | **Roster + per-character balance**: `TIERS`, `CHARACTERS` (stats, behaviours, `sprites`, `sound`), `POWERUPS`, `MAIN_ID`, `isMainWave` |
 | `js/data/heroes.js` | `HEROES`: the 4 self characters (sprites/sound; gameplay use comes in plan phase D) |
@@ -96,7 +99,9 @@ Application → "Update on reload", otherwise you may see the cached old version
 The user's rule: **Claude is code inspector + project manager.** Bulk/initial coding is
 delegated, then Claude reviews diffs in detail, runs tests, fixes small issues itself and
 sends larger corrections back to the tools.
-- `opencode run -m opencode/crouton-alpha-free --auto "<brief>"` (unlimited; default choice)
+- `opencode run -m opencode/<model> --auto "<brief>"`. **`crouton-alpha-free` is no longer
+  available (2026-11-10)**; check `opencode models` and ask the user which model to use.
+  For the lasso mode the user chose to have Claude write the code directly.
 - `agy -p "<brief>" --model claude-opus-4-6-thinking --mode accept-edits`; when its limit
   is reached use `--model gemini-3.8-flash-high`. **Caveat (2026-11-09):** in print mode
   agy stops at its first permission prompt (even listing a folder), `--mode auto` isn't
@@ -106,7 +111,8 @@ sends larger corrections back to the tools.
 - Two agents can run in parallel only on disjoint files (say so in each brief).
 - Briefs: precise file list, exact values, "don't" list (no docs edits, no commits, no
   deps), and "done when" checks. Keep briefs in the session scratchpad, not the repo.
-- Current roadmap: `docs/PLAN-v2.md`. Art/sound prompts for the user: `docs/prompts/`.
+- Current roadmap: `docs/PLAN-v2.md` (done except phase F) and `docs/PLAN-lasso.md`
+  (Rope 'Em! mode, branch `lasso`). Art/sound prompts for the user: `docs/prompts/`.
 
 ## Documentation upkeep (mandatory)
 These docs exist so the next agent can pick up context fast. When you change the
@@ -121,7 +127,8 @@ project, update the docs **in the same change**:
 ## Repo / git state
 - Remote: `https://github.com/mrashidbd/hasina-game.git`
 - Branches: `main` (live; pushes deploy via the Pages workflow), `v2` (v2 work branch,
-  merged into `main` 2026-11-09) and `claude/modest-bohr-vzpqz0` (original branch, stale).
+  merged into `main` 2026-11-09), `lasso` (Rope 'Em! mode, from `v2`, 2026-11-10; not live
+  yet) and `claude/modest-bohr-vzpqz0` (original branch, stale).
   The GitHub *default* branch is still `claude/modest-bohr-vzpqz0`.
 - **Live site: https://mrashidbd.github.io/hasina-game/** — every push to `main` deploys
   (GitHub Pages, source: GitHub Actions; the `github-pages` environment allows `main` only).

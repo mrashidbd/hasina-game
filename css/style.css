@@ -146,3 +146,8 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
   .panel button { padding: 10px; }
   .bigscore { font-size: 42px; }
 }
+
+/* Mode-specific UI: body[data-mode] is set by main.js */
+body[data-mode="classic"] .lassoOnly { display: none; }
+body[data-mode="lasso"] #sweepBtn { display: none; }
+#playLassoBtn { background: linear-gradient(180deg, #d9a85b, #a8742f); border-color: #e7b86a; box-shadow: 0 6px 20px rgba(201,162,107,.35); }

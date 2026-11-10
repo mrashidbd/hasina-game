@@ -38,6 +38,7 @@ show the default values; the code reads them as `CONFIG.<group>.<key>`. `BASE_MO
 
 ```
 index.html ──loads──> js/main.js (UI glue)
+                         ├── js/lasso.js (LassoGame extends Game: Rope 'Em! mode)
                          ├── js/game.js (engine: Game class)
                          │      ├── js/map.js        (geometry + map data)
                          │      ├── js/config.js     (CONFIG: all tunables)
@@ -64,6 +65,20 @@ three **hooks** passed to the constructor by `main.js`:
 | `onPerks(ids)` | after the break following every `PERK_EVERY`-th wave | shows the upgrade screen; main.js calls `game.choosePerk(id)` |
 
 ## Game modes
+There are two **play modes**, each a `Game` instance on the same canvas (`main.js`
+`games = { classic, lasso }`). Only the one with `active = true` updates, draws and takes
+input; `setMode(m)` switches, sets `body[data-mode]` (CSS hides `.lassoOnly` / `#sweepBtn`),
+and saves `kto-mode`. `window.__game` is always the active one.
+- **classic** = `Game` (`js/game.js`): this whole document unless stated otherwise.
+- **lasso** ("Rope 'Em!") = `LassoGame extends Game` (`js/lasso.js`), see
+  "Rope 'Em! mode" below and `docs/PLAN-lasso.md`.
+
+Override points in `Game` that the lasso mode uses: `updateEffects(dt)` (cosmetics, all
+modes) / `updatePlay(dt)` (simulation), `nextWave()`, `spawn()`, `spawnPoint()`,
+`breach()`, `onPointer()`, `useSweep()`, `wavePool(n)`, `powerupKinds()`, `leakLabel()`,
+`stealthAlpha(e)`, `drawLayer(t)` (after kicks), `drawHint(t)`, `drawBossBar()`,
+`summary()`. `e.pose` (optional) overrides the sprite pose in `drawEnemy`.
+
 `Game.hero` is the chosen hero id (`HEROES`), set by `start(heroId)`.
 `Game.mode` is one of `'menu' | 'playing' | 'paused' | 'perk' | 'over'`
 (`'perk'` = simulation stopped while the upgrade screen is open).
@@ -202,12 +217,40 @@ constants: `tapRadius` (× hit radius), `knockback` (× 0.035 push), `sweepGain`
 live 6 s and blink in the last 1.5 s. Adding a power-up = entry in `POWERUPS` + branch
 in `collect()` + `pu.*`, `puName.*`, `puDesc.*` strings.
 
+## Rope 'Em! mode (`js/lasso.js`)
+Tunables: `CONFIG.lasso`. `wave` is the **round** number.
+- **Patrol loop** `PATROL` (module level): the BD mainland resampled to `pathPoints`, pushed
+  `pathInset` inside along each edge normal, smoothed (`pathSmooth`). The hero has an arc
+  position `heroS` and direction `heroDir` (`reverse()`, ⇄ button / `R`), runs one lap per
+  `heroLapTime`, and stands still while `rope` is not null.
+- **Rounds**: `nextWave()` sets `target`, `roundT`, the spawn rate and `speedMul`, and maybe
+  schedules Hasina (`mainAt`). `endRound()` at time 0 → bonus + `breakTime` break, or
+  `gameOver('target')`. `targetLeft` = time left when the target was reached (time bonus).
+- **Characters**: spawned at random points inside BD (via `warn()` → `spawnPoint()`), up to
+  a cap. `state`: `lurk` (random waypoints, never leaves BD) → `bolt` (to the nearest India
+  border point + overshoot) → escape when outside BD (`breach`: penalty, or game over /
+  shield for Hasina). `roped` while on the rope; `dash` after the rope snaps. `near` is
+  only set while bolting/dashing (danger ring, border glow). Hasina uses `mainSpeed`.
+- **Rope** `{ phase: 'out' | 'back' | 'reel', x, y, tx, ty, target, cx, cy, auto, tug, autoT }`
+  in map units. `out` flies at `ropeSpeed` to the tap (clamped to `ropeRange`), `landLoop()`
+  picks the nearest catchable character within `loopRadius` (stealth alpha ≥ 0.5; dodgers
+  may hop out). 1-HP characters auto-reel (`autoReelTime`); others have a tug meter that
+  taps raise (`reelPerTap / strength`) and the character lowers (`pullBase × strength`/s),
+  with strength = `hp^strengthExp` (× `mainPullMul` for Hasina). Meter ≥ 1 → `ropeCatch()`;
+  ≤ 0 → `snap()`.
+- **Scoring**: points × combo multiplier (Hasina `mainPoints`), `roundBonus × round` +
+  `timeBonusPerSec × targetLeft`. Escapes cost the tier penalty (`stats.leaked` = escaped).
+- Drawing (`drawLayer`): dashed patrol loop, rope (quadratic curve with sag) and loop
+  ellipse, tug meter + "TAP TAP!", the hero (sprite poses `run`/`throw`/`pull`/`cheer`
+  if present in the manifest, else `ready`/`kick`; emoji disc fallback), range ring.
+
 ## Rendering order (`render()`)
 India background → Myanmar → sea gradient → labels → Bangladesh fill + red flag disc
 (clipped) → border outline (India border glows mint / pulses red when any enemy is
 within `DANGER`, orange & thick while wall is active) → Dhaka dot + label → power-ups →
 spawn warnings (`drawWarning`) → fleeing intruders (`drawFleeing`) → enemies (`drawEnemy`: danger ring, tier-1 gold aura, shadow, body/sprite/emoji, frozen
-tint, HP bar if maxHp>1, name tag for tier ≤ 2) → first-catch "TAP!" hint → breach
+tint, HP bar if maxHp>1, name tag for tier ≤ 2) → kicks → `drawLayer` (mode extras) →
+`drawHint` (first-catch "TAP!" hint) → breach
 marker → particles → floaters → full-screen overlays (freeze tint, sweep flash, leak
 flash, `drawBossBar` (gold HP bar under the HUD while tier 1 is alive), red vignette
 when tier 1 is near the border). Hero kicks (`drawKick`) are drawn right after the enemies. Screen shake translates the
@@ -218,7 +261,9 @@ Map labels come from `LABELS[].key` → `t('map.<key>')`, so they follow the lan
 ## Persistence (`localStorage` keys)
 | Key | Value |
 |---|---|
-| `kto-best` | `{ score, wave }` |
+| `kto-best` | `{ score, wave }` (classic) |
+| `kto-best-lasso` | `{ score, wave }` (Rope 'Em!; `wave` = round) |
+| `kto-mode` | last picked mode, `'classic'` / `'lasso'` |
 | `kto-lang` | `'en'` / `'bn'` (default: Bangla if `navigator.language` starts with `bn`) |
 | `kto-muted` | `'1'` / `'0'` |
 | `kto-hero` | chosen hero id (`farmer`, `studentM`, `studentF`, `common`) |

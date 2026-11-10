@@ -123,4 +123,56 @@ export const CONFIG = {
     musicVolume: 0.35, // volume, music track volume
     sfxVolume: 1, // volume, multiplier on file-playback volume
   },
+  // "Rope 'Em!" mode (js/lasso.js). Map units: 1 ≈ 100 km. See docs/PLAN-lasso.md.
+  lasso: {
+    roundTime: 60, // s, length of a round
+    breakTime: 2.2, // s, pause between rounds
+    targetBase: 5, // catches, round target = targetBase + targetPerRound × round
+    targetPerRound: 2, // catches per round
+    mainCountsAs: 5, // catches, a Hasina catch counts this much toward the target
+    unlockPerRound: 1.5, // classic waves per round, for `unlock` and pool weights
+    maxOnMapBase: 4, // count, characters on the map at once (round 1)
+    maxOnMapPerRound: 0.6, // count added per round
+    maxOnMapCap: 12, // count, hard cap
+    firstSpawnDelay: 0.6, // s
+    spawnEvery: 1.6, // s between spawns (round 1)
+    spawnSpeedup: 0.92, // factor per round
+    spawnEveryMin: 0.6, // s
+    spawnHeroGap: 0.6, // map units, spawns keep this far from the hero
+    speedMul: 0.55, // × character speed (classic speeds are for a sprint)
+    speedPerRound: 0.06, // speed bonus per round
+    lurkMin: 6, lurkMax: 12, // s wandering before bolting for the border (tier 3)
+    lurkTier2Mul: 0.85, // × lurk time for tier 2
+    mainLurkMul: 0.5, // × lurk time for Hasina
+    boltSpeedMul: 1.6, // × speed while bolting for the border
+    boltOvershoot: 0.4, // map units past the border they aim for
+    waypointMinDist: 0.6, // map units between lurk waypoints
+    mainSpeed: 0.26, // map units/s, Hasina's base speed (the fastest on the map)
+    mainFromRound: 2, // round, Hasina can appear from this round
+    mainChance: 0.35, // chance per round (at most once per round)
+    mainEveryRound: 4, // Hasina is guaranteed every Nth round
+    mainPoints: 1000, // points for catching Hasina
+    pathPoints: 320, // count, samples on the hero's patrol loop
+    pathInset: 0.12, // map units the patrol loop sits inside the border
+    pathSmooth: 9, // samples, moving-average window that smooths the loop
+    heroLapTime: 16, // s for one full lap
+    heroSizePx: 56, // px, hero size
+    cheerTime: 0.6, // s, cheer pose after a catch
+    ropeRange: 1.7, // map units, max throw distance
+    ropeSpeed: 7, // map units/s, loop flight speed (out and back)
+    loopRadius: 0.28, // map units, catch radius of the loop
+    dodgeChance: 0.5, // chance a dodger jumps out of an incoming loop
+    dodgeDist: 0.35, // map units, dodge jump
+    autoReelTime: 0.45, // s to pull in a 1-HP character
+    reelStart: 0.35, // tug meter start value (0..1)
+    reelPerTap: 0.2, // tug gain per tap ÷ strength
+    pullBase: 0.1, // tug loss per s × strength
+    strengthExp: 0.35, // strength = hp ^ strengthExp
+    mainPullMul: 1.2, // × Hasina's pull
+    breakDashTime: 0.6, // s a character dashes away after the rope snaps
+    breakDashMul: 3, // × speed while dashing away
+    roundBonus: 100, // points × round for reaching the target
+    timeBonusPerSec: 10, // points per second left when the target was reached
+    powerups: ['freeze', 'wall', 'shield'], // kinds that can drop in this mode
+  },
 };

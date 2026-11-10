@@ -30,3 +30,11 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 
 ## Content placeholders (user to decide)
 - [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).
+
+## Rope 'Em! mode (branch `lasso`)
+- [ ] Play-test balance on a phone: rope range, lap time, lurk times, tug numbers, round target.
+- [ ] Not live yet: merge `lasso` into `main` when the user approves.
+- [ ] Rope sounds (throw whoosh, loop tighten, snap) are not in `docs/prompts/sound-design.md`
+      yet; the mode reuses `tap`, `hit` and `leak`.
+- [ ] Ideas: perks for this mode, an endless variant, letting the player drag the hero.
+

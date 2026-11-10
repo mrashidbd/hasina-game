@@ -16,7 +16,10 @@ that result as a reference for the other poses.
 |---|---|---|---|
 | ready | `ready.png` | **yes** | Hero-select screen; first frame when the hero pops up |
 | kick | `kick.png` | **yes** | The kick (shown ~0.25 s per tap) |
-| cheer | `cheer.png` | optional | Wave cleared / new record |
+| cheer | `cheer.png` | optional | Wave cleared / new record; a catch in Rope 'Em! mode |
+| run | `run.png` | optional | Rope 'Em! mode: running along the border (fallback `ready`) |
+| throw | `throw.png` | optional | Rope 'Em! mode: throwing the rope (fallback `kick`) |
+| pull | `pull.png` | optional | Rope 'Em! mode: reeling a caught crook in (fallback `kick`) |
 
 ---
 
@@ -49,6 +52,25 @@ balance, motion lines behind the kicking foot, fierce happy shout.
 **cheer** (optional)
 ```
 Pose: jumping with both fists in the air, eyes closed, huge happy grin.
+```
+
+**run** (optional, Rope 'Em! mode)
+```
+Pose: running fast to the right, mid-stride, a coiled rope looped over one shoulder,
+determined grin.
+```
+
+**throw** (optional, Rope 'Em! mode)
+```
+Pose: throwing a cowboy-style rope lasso to the right: throwing arm stretched forward and
+up, the open rope loop flying out to the right, other hand holding the rope coil, legs
+braced apart.
+```
+
+**pull** (optional, Rope 'Em! mode)
+```
+Pose: leaning far back to the LEFT and pulling hard on a taut rope with both hands, the
+rope going out to the right edge of the image, heels dug in, straining funny face.
 ```
 
 ---

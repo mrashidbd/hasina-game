@@ -3,6 +3,24 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-10 — "Rope 'Em!" mode (branch `lasso`)
+- New second mode picked on the menu: crooks lurk inside Bangladesh and bolt for India; the
+  hero patrols the border and throws a rope; tough ones are reeled in by tapping fast. Timed
+  rounds with a catch target; Hasina is rare and fast, and her escape ends the run. Design:
+  `docs/PLAN-lasso.md`; code `js/lasso.js` (`LassoGame extends Game`), `CONFIG.lasso`.
+- Engine hooks in `game.js` (classic behaviour unchanged): `active` flag, `updateEffects` /
+  `updatePlay`, `wavePool`, `powerupKinds`, `leakLabel`, `stealthAlpha`, `drawLayer`,
+  `drawHint`, `e.pose`; helpers exported.
+- UI: two play buttons, per-mode best (`kto-best-lasso`), `kto-mode`, HUD time/caught/⇄,
+  lasso how-to rules, all text en + bn. Optional hero poses `run`/`throw`/`pull` (prompt doc
+  updated; the asset report lists them as optional). SW `kto-v9`.
+- Written by Claude: opencode's `crouton-alpha-free` is no longer available.
+- Tested headless (desktop + phone). Not yet: human balance play-test.
+
+## 2026-11-09 — asset folders
+- Created the full `assets/` folder tree (17 enemy, 4 hero, sfx and music folders, each with
+  a `.gitkeep`) and a folder → character table in `assets/README.md`, ready for the user's art.
+
 ## 2026-11-09 — v2 live
 - `v2` (phases A–E) fast-forwarded into `main` and deployed to GitHub Pages (SW `kto-v8`).
   Art and sound files are still missing, so the live game shows emoji and synth sounds.

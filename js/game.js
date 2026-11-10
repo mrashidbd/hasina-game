@@ -11,12 +11,12 @@ import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
 import { getSprite } from './assets.js';
 
-const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+export const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
-const rand = (a, b) => a + Math.random() * (b - a);
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+export const rand = (a, b) => a + Math.random() * (b - a);
+export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-function weighted(pool) {
+export function weighted(pool) {
   const total = pool.reduce((s, [, w]) => s + w, 0);
   let r = Math.random() * total;
   for (const [k, w] of pool) { if ((r -= w) <= 0) return k; }
@@ -29,6 +29,7 @@ export class Game {
     this.ctx = canvas.getContext('2d');
     this.hooks = hooks; // onHud, onBanner, onGameOver, onPerks
     this.mode = 'menu';
+    this.active = true; // only the active mode's game draws and takes input (main.js)
     this.insets = { top: CONFIG.layout.hudTop, bottom: CONFIG.layout.hudBottom };
     this.reset();
     this.resize();
@@ -150,10 +151,7 @@ export class Game {
     const count = CONFIG.waves.countBase + Math.floor(n * CONFIG.waves.countPerWave);
     // Weighting: the backbone small leaders have fixed weights; other small
     // leaders and senior leaders grow with the wave number.
-    const w = CONFIG.waves;
-    const pool = Object.entries(CHARACTERS)
-      .filter(([, c]) => c.tier > 1 && n >= (c.unlock ?? 1))
-      .map(([k, c]) => [k, w.poolBackbone[k] ?? (c.tier === 3 ? w.poolTier3Base + n * w.poolTier3PerWave : w.poolTier2Base + n * w.poolTier2PerWave)]);
+    const pool = this.wavePool(n);
     const q = [];
     for (let i = 0; i < count; i++) q.push(weighted(pool));
     const main = isMainWave(n);
@@ -164,6 +162,14 @@ export class Game {
     this.spawnT = CONFIG.waves.firstSpawnDelay;
     this.hooks.onBanner?.(tr('wave', { n }), main ? tr('mainIncoming') : tr('nIntruders', { n: q.length }));
     sfx.wave();
+  }
+
+  /** [id, weight] pairs of the tier 2/3 characters unlocked by wave n (CONFIG.waves). */
+  wavePool(n) {
+    const w = CONFIG.waves;
+    return Object.entries(CHARACTERS)
+      .filter(([, c]) => c.tier > 1 && n >= (c.unlock ?? 1))
+      .map(([k, c]) => [k, w.poolBackbone[k] ?? (c.tier === 3 ? w.poolTier3Base + n * w.poolTier3PerWave : w.poolTier2Base + n * w.poolTier2PerWave)]);
   }
 
   waveCleared() {
@@ -281,7 +287,7 @@ export class Game {
 
   // ---------------------------------------------------------------- input
   onPointer(ev) {
-    if (this.mode !== 'playing') return;
+    if (!this.active || this.mode !== 'playing') return;
     ev.preventDefault();
     const rect = this.canvas.getBoundingClientRect();
     const px = ev.clientX - rect.left;
@@ -439,10 +445,13 @@ export class Game {
   }
 
   dropPowerup(x, y) {
-    const kinds = Object.keys(POWERUPS).filter((k) => k !== 'shield' || this.shield < CONFIG.powerups.maxShield);
+    const kinds = this.powerupKinds().filter((k) => k !== 'shield' || this.shield < CONFIG.powerups.maxShield);
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     this.powerups.push({ kind, x, y, t: 0, life: CONFIG.powerups.life });
   }
+
+  /** Power-up kinds this mode can drop (overridden by other modes). */
+  powerupKinds() { return Object.keys(POWERUPS); }
 
   collect(pu) {
     this.powerups.splice(this.powerups.indexOf(pu), 1);
@@ -471,7 +480,7 @@ export class Game {
       this.shake = Math.max(this.shake, e.def.tier === 2 ? 0.3 : 0.15);
       sfx.leak();
       navigator.vibrate?.(50);
-      this.floater(this.sx(e.x), this.sy(e.y) - 20, lost ? `−${fmt(lost)} ${tr('leaked')}` : tr('leaked'), '#ff5a6a', e.def.tier === 2 ? 1.3 : 1);
+      this.floater(this.sx(e.x), this.sy(e.y) - 20, lost ? `−${fmt(lost)} ${this.leakLabel()}` : this.leakLabel(), '#ff5a6a', e.def.tier === 2 ? 1.3 : 1);
       this.burst(e.x, e.y, '#ff5a6a', 12);
       return;
     }
@@ -496,6 +505,8 @@ export class Game {
     setTimeout(() => this.hooks.onGameOver?.(this.summary()), 1100);
   }
 
+  leakLabel() { return tr('leaked'); }
+
   summary() {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
@@ -507,6 +518,13 @@ export class Game {
 
   // ---------------------------------------------------------------- update
   update(dt) {
+    this.updateEffects(dt);
+    if (this.mode !== 'playing') return;
+    this.updatePlay(dt);
+  }
+
+  /** Cosmetic timers, particles, kicks and fleeing intruders (all modes). */
+  updateEffects(dt) {
     this.shake = Math.max(0, this.shake - dt);
     this.flash = Math.max(0, this.flash - dt);
     this.leakFlash = Math.max(0, this.leakFlash - dt);
@@ -528,8 +546,9 @@ export class Game {
       }
       this.fleeing = this.fleeing.filter((f) => f.traveled < CONFIG.kick.fleeDistancePx);
     }
+  }
 
-    if (this.mode !== 'playing') return;
+  updatePlay(dt) {
     this.time += dt;
     this.freezeT = Math.max(0, this.freezeT - dt);
     this.wallT = Math.max(0, this.wallT - dt);
@@ -721,15 +740,8 @@ export class Game {
 
     // kicks (hero pops up behind the intruder, on top)
     for (const k of this.kicks) this.drawKick(k);
-    if (this.mode === 'playing' && this.stats.caught === 0 && this.enemies.length) {
-      const e = this.enemies[0];
-      const x = this.sx(e.x), y = this.sy(e.y) - this.rpx(e.r) - 22 - Math.abs(Math.sin(t * 6)) * 8;
-      ctx.font = `800 18px system-ui, sans-serif`;
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      ctx.strokeText(tr('tapHint'), x, y);
-      ctx.fillStyle = '#ffe15a';
-      ctx.fillText(tr('tapHint'), x, y);
-    }
+    this.drawLayer(t);
+    this.drawHint(t);
 
     // breach marker
     if (this.breachAt) {
@@ -795,6 +807,25 @@ export class Game {
     }
   }
 
+  /** Extra mode-specific drawing on top of the characters (other modes override). */
+  drawLayer() {}
+
+  /** First-run hint over the first intruder. */
+  drawHint(t) {
+    if (this.mode !== 'playing' || this.stats.caught !== 0 || !this.enemies.length) return;
+    const e = this.enemies[0];
+    this.hintText(tr('tapHint'), this.sx(e.x), this.sy(e.y) - this.rpx(e.r) - 22 - Math.abs(Math.sin(t * 6)) * 8);
+  }
+
+  hintText(text, x, y) {
+    const { ctx } = this;
+    ctx.font = `800 18px system-ui, sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = '#ffe15a';
+    ctx.fillText(text, x, y);
+  }
+
   drawWarning(w, t) {
     const { ctx } = this;
     const x = this.sx(w.p.x), y = this.sy(w.p.y);
@@ -830,13 +861,16 @@ export class Game {
     ctx.fillText(`${boss.def.emoji} ${tr(`char.${boss.type}`)} · ${fmt(Math.max(0, boss.hp))}/${fmt(boss.maxHp)}`, this.w / 2, y + bh / 2 + 1);
   }
 
+  /** Opacity of a character (stealth ones fade in and out). */
+  stealthAlpha(e) {
+    return e.def.stealth ? 0.25 + 0.75 * Math.max(0, Math.sin(e.t * 2.2 + e.seed)) ** 2 : 1;
+  }
+
   drawEnemy(e, t) {
     const { ctx } = this;
     const x = this.sx(e.x), y = this.sy(e.y) - (e.hop > 0 ? Math.sin((1 - e.hop) * Math.PI) * CONFIG.kick.fleeHopPx * 0.5 : 0);
     const r = this.rpx(e.r);
-    let alpha = 1;
-    if (e.def.stealth) alpha = 0.25 + 0.75 * Math.max(0, Math.sin(e.t * 2.2 + e.seed)) ** 2;
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = this.stealthAlpha(e);
 
     if (e.near < CONFIG.combat.dangerDistance) {
       ctx.strokeStyle = `rgba(255,60,80,${0.5 + 0.5 * Math.sin(t * 14)})`;
@@ -856,7 +890,7 @@ export class Game {
     const bob = Math.sin(e.t * 10 + e.seed) * (this.freezeT > 0 ? 0 : 2);
     const frozen = this.freezeT > 0;
     // Frozen uses the idle pose (getSprite falls back to walk).
-    const sprite = getSprite(e.def, frozen ? 'idle' : 'walk');
+    const sprite = getSprite(e.def, e.pose ?? (frozen ? 'idle' : 'walk'));
 
     if (sprite) {
       // Full-body, feet-anchored, no coloured circle. Art faces right.
@@ -1033,9 +1067,11 @@ export class Game {
   loop(now) {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    this.update(dt);
-    this.render();
-    this.hooks.onHud?.(this);
+    if (this.active) {
+      this.update(dt);
+      this.render();
+      this.hooks.onHud?.(this);
+    }
     requestAnimationFrame((t) => this.loop(t));
   }
 }

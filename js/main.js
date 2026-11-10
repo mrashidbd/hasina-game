@@ -1,4 +1,5 @@
 import { Game } from './game.js';
+import { LassoGame } from './lasso.js';
 import { CHARACTERS, POWERUPS, TIERS } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
 import { PERKS } from './perks.js';
@@ -29,7 +30,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ----- HUD
-const hud = { score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
+const hud = { timer: $('timer'), target: $('target'), score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
 const lastHud = {};
 function setText(el, key, v) { if (lastHud[key] !== v) { lastHud[key] = v; el.textContent = v; } }
 function onHud(g) {
@@ -40,6 +41,10 @@ function onHud(g) {
   const left = `${Math.round(g.comboLeft() * 100)}%`;
   if (lastHud.comboBar !== left) { lastHud.comboBar = left; hud.comboBar.style.width = left; }
   setText(hud.shield, 'shield', '🛡️'.repeat(g.shield));
+  if (g instanceof LassoGame) {
+    setText(hud.timer, 'timer', fmt(Math.ceil(g.roundT)));
+    setText(hud.target, 'target', `${fmt(g.caughtRound)}/${fmt(g.target)}`);
+  }
   const pct = `${g.sweep}%`;
   if (lastHud.sweep !== pct) { lastHud.sweep = pct; hud.sweepFill.style.width = pct; }
   hud.sweepBtn.classList.toggle('ready', g.sweep >= 100);
@@ -61,10 +66,11 @@ function onBanner(title, sub) {
 }
 
 /** Save a run's score if it beats the stored best. Returns [isRecord, previousBest]. */
+const bestKey = (m) => (m === 'lasso' ? 'kto-best-lasso' : 'kto-best');
 function saveBest(score, wave) {
-  const best = store.get('kto-best', { score: 0, wave: 0 });
+  const best = store.get(bestKey(mode), { score: 0, wave: 0 });
   const isRecord = score > best.score;
-  if (isRecord) store.set('kto-best', { score, wave });
+  if (isRecord) store.set(bestKey(mode), { score, wave });
   return [isRecord, best];
 }
 
@@ -110,7 +116,18 @@ let lastBest = 0;
 function renderOver() {
   const s = lastResult;
   if (!s) return;
-  $('overReason').textContent = t('breachReason', { who: s.intruderType ? t(`char.${s.intruderType}`) : '', wave: s.wave });
+  const who = s.intruderType ? t(`char.${s.intruderType}`) : '';
+  if (s.mode === 'lasso') {
+    $('overReason').textContent = s.reason === 'escape'
+      ? t('lOverEscape', { who, n: s.round })
+      : t('lOverTarget', { n: s.caughtRound, target: s.target, round: s.round });
+    $('overStats').innerHTML = [
+      ['sRound', fmt(s.round)], ['sCaught', fmt(s.caught)], ['sEscaped', fmt(s.escaped)], ['sCombo', fmt(s.bestCombo)],
+      ['sAcc', `${fmt(s.accuracy)}%`], ['sMain', fmt(s.mains)], ['sLost', fmt(s.lost)], ['sBest', fmt(lastBest)],
+    ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
+    return;
+  }
+  $('overReason').textContent = t('breachReason', { who, wave: s.wave });
   $('overStats').innerHTML = [
     ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
     ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)], ['sPerks', fmt(s.perks)],
@@ -119,13 +136,43 @@ function renderOver() {
   ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
 }
 
-const game = new Game($('game'), { onHud, onBanner, onGameOver, onPerks });
+// One game per mode on the same canvas; only the active one draws and takes input.
+const hooks = { onHud, onBanner, onGameOver, onPerks };
+const games = { classic: new Game($('game'), hooks), lasso: new LassoGame($('game'), hooks) };
+let mode = store.get('kto-mode', 'classic');
+if (!games[mode]) mode = 'classic';
+let game = games[mode];
+games.lasso.active = mode === 'lasso';
+games.classic.active = mode === 'classic';
 window.__game = game; // handy for debugging from the console
 let lastResult = null;
 
+function setMode(m) {
+  if (!games[m]) return;
+  if (game !== games[m]) {
+    game.active = false;
+    game.mode = 'menu';
+    game.reset();
+    game = games[m];
+    game.active = true;
+    game.last = performance.now();
+    window.__game = game;
+  }
+  mode = m;
+  store.set('kto-mode', m);
+  document.body.dataset.mode = m;
+  $('waveLbl').dataset.i18n = m === 'lasso' ? 'hudRound' : 'hudWave';
+  $('waveLbl').textContent = t($('waveLbl').dataset.i18n);
+  for (const k of Object.keys(lastHud)) delete lastHud[k];
+}
+
 function updateBest() {
   const best = store.get('kto-best', { score: 0, wave: 0 });
-  $('bestLine').textContent = best.score ? t('best', { score: best.score, wave: best.wave }) : t('noBest');
+  const bestL = store.get('kto-best-lasso', { score: 0, wave: 0 });
+  const lines = [];
+  if (best.score) lines.push(t('best', { score: best.score, wave: best.wave }));
+  if (bestL.score) lines.push(t('bestLasso', { score: bestL.score, wave: bestL.wave }));
+  $('bestLine').innerHTML = lines.length ? lines.join('<br>') : t('noBest');
 }
 
 function play(heroId = selectedHero) {
@@ -166,7 +213,9 @@ $('heroGrid').ondblclick = (e) => {
 };
 
 // ----- buttons
-$('playBtn').onclick = () => { unlockAudio(); renderHeroes(); show('heroSelect'); };
+$('playBtn').onclick = () => { unlockAudio(); setMode('classic'); renderHeroes(); show('heroSelect'); };
+$('playLassoBtn').onclick = () => { unlockAudio(); setMode('lasso'); renderHeroes(); show('heroSelect'); };
+$('dirBtn').onclick = () => game.reverse?.();
 $('startBtn').onclick = () => play(selectedHero);
 $('againBtn').onclick = () => play(selectedHero);
 $('howBtn').onclick = () => show('howto');
@@ -189,7 +238,9 @@ syncMute();
 
 $('shareBtn').onclick = async () => {
   const s = lastResult;
-  const text = t('shareText', { wave: s?.wave ?? 1, score: s?.score ?? 0 });
+  const text = s?.mode === 'lasso'
+    ? t('lShareText', { round: s.round, score: s.score })
+    : t('shareText', { wave: s?.wave ?? 1, score: s?.score ?? 0 });
   const url = location.href.split('#')[0];
   try {
     if (navigator.share) await navigator.share({ title: t('title'), text, url });
@@ -200,6 +251,7 @@ $('shareBtn').onclick = async () => {
 // keyboard (desktop)
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); game.useSweep(); }
+  if (e.code === 'KeyR' && game.mode === 'playing') game.reverse?.();
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (game.mode === 'playing') { game.pause(); show('pause'); } else if (game.mode === 'paused') { game.resume(); show(null); }
   }
@@ -222,6 +274,7 @@ function applyLang() {
   document.title = t('title');
   for (const el of document.querySelectorAll('[data-i18n]')) el.innerHTML = t(el.dataset.i18n);
   $('rules').innerHTML = t('rules').map((li) => `<li>${li}</li>`).join('');
+  $('lRules').innerHTML = t('lRules').map((li) => `<li>${li}</li>`).join('');
   $('roster').innerHTML = [1, 2, 3].map((tier) => {
     const note = TIERS[tier].gameOver ? t('tier1Note') : t('tierPenalty', { n: TIERS[tier].penalty });
     const rows = Object.entries(CHARACTERS).filter(([, c]) => c.tier === tier).map(([k, c]) => {
@@ -251,6 +304,7 @@ preloadImages(() => {
   cancelAnimationFrame(artRefresh);
   artRefresh = requestAnimationFrame(() => applyLang());
 });
+setMode(mode);
 applyLang();
 show('menu');
 

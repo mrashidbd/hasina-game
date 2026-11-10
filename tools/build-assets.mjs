@@ -28,6 +28,7 @@ const ENEMIES = [
 const HEROES = ['farmer', 'studentM', 'studentF', 'common'];
 const ENEMY_POSES = ['walk', 'kicked', 'idle'];
 const HERO_POSES = ['ready', 'kick', 'cheer'];
+const HERO_OPTIONAL = ['run', 'throw', 'pull']; // Rope 'Em! mode; fall back to ready/kick
 const GAME_SFX = [
   'hit', 'miss', 'catch', 'combo', 'close', 'power', 'freeze', 'wall',
   'shield', 'sweep', 'wave', 'cleared', 'warn', 'boss', 'leak',
@@ -94,7 +95,9 @@ for (const id of ENEMIES) {
 for (const id of HEROES) {
   const missing = HERO_POSES.filter((p) => !known.has(`assets/heroes/${id}/${p}.png`));
   if (!soundPresent(`assets/sfx/heroes/${id}`)) missing.push('sfx');
-  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}`);
+  const opt = HERO_OPTIONAL.filter((p) => !known.has(`assets/heroes/${id}/${p}.png`));
+  const optNote = opt.length ? ` (optional, not yet: ${opt.join(', ')})` : '';
+  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}${optNote}`);
 }
 const gameMissing = GAME_SFX.filter((n) => !soundPresent(`assets/sfx/game/${n}`));
 console.log(`game sfx: ${gameMissing.length === 0 ? 'complete' : `missing ${gameMissing.length} (${gameMissing.join(', ')})`}`);
