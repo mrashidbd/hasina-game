@@ -36,7 +36,7 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
       (`mainPullMul`), `mainAfterLocked`, level pace.
 - [ ] On narrow portrait phones little Indian land is on screen, so lurkers crowd the left
       and right edges; consider a lurk band that hugs the border more tightly there.
-- [ ] Not live yet: merge `lasso` into `main` when the user approves.
+- [x] Live: `lasso` merged into `main` (2026-11-12).
 - [ ] Rope sounds (throw whoosh, loop tighten, snap) are not in `docs/prompts/sound-design.md`
       yet; the mode reuses `tap`, `hit` and `leak`.
 - [ ] Ideas: perks for this mode, an endless variant, letting the player drag the hero.

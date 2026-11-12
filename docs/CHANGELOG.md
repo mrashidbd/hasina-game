@@ -3,6 +3,10 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-12 — `lasso` goes live
+- `lasso` fast-forwarded into `main` and deployed: both modes (Keep Them Out + Rope 'Em!), the
+  simplified rules, reaction bubbles and all 21 3D characters. SW `kto-v12`.
+
 ## 2026-11-12 — all 21 characters (made by the user in Google Flow)
 - The user generated all 21 characters by hand in Google Flow with the prompts in
   `docs/prompts/flow-batches.md` (the queued agy job was cancelled), replacing the 11
