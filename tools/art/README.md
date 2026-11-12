@@ -44,3 +44,10 @@ built-ins, the global `WebSocket`/`fetch`, and the `agy` CLI.
 - Tone rules: characters stay comic and harmless — cheeky, sneaky or sulky
   villains; cheerful, brave heroes; no weapons, nothing scary. Keep
   `prompts.mjs` in sync with the prompt docs when the roster changes.
+
+## Manual generation (Google Flow / Gemini web)
+Prompts in batches of 10: `docs/prompts/flow-batches.md`. Generate square images on the green
+background, download them, and save each as `art-src/<kind>/<id>.png` (for example
+`art-src/enemies/shohag.png`, `art-src/heroes/studentM.png`). Then run
+`node tools/chroma-key.mjs && node tools/build-assets.mjs`. `gen-art.mjs` skips any id that
+already has a file in `art-src/`.
