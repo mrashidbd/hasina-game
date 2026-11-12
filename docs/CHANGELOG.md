@@ -12,7 +12,7 @@ left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.
   - renamed `studenF.jpg` → `studentF.jpg`;
   - removed the Windows `*:Zone.Identifier` files;
   - keyed all 21 (`tools/chroma-key.mjs`; the green flag headbands survived) and rebuilt
-    the manifest (21 files, ~2.5 MB).
+    the manifest (21 files, ~2.5 MB). SW `kto-v12`.
   - The asset report now treats `kicked`/`idle`/`kick`/`cheer` as optional (the game fakes
     them).
 - Tested headless (desktop + phone): all 21 images load, no page errors; hero select,
