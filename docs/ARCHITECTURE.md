@@ -6,9 +6,11 @@ Line references are approximate — search for the function name.
 
 ## Configuration
 All numbers that shape gameplay live in `CONFIG` (`js/config.js`), grouped as `layout`,
-`spawn`, `waves`, `scoring`, `input`, `combat`, `powerups`, `perks`, `kick`. Formulas below
-show the default values; the code reads them as `CONFIG.<group>.<key>`. `BASE_MODS` in
-`js/perks.js` copies the perk-adjustable ones at the start of each run.
+`spawn`, `waves`, `scoring`, `input`, `combat`, `powerups`, `kick`, `sprites`, `audio`, `fun`,
+`lasso`. Formulas below show the default values; the code reads them as
+`CONFIG.<group>.<key>`. `BASE_MODS` in `js/perks.js` holds per-run modifiers copied to
+`game.mods` each run (the perk/upgrade screen was removed on 2026-11-12; the modifiers stay as
+an extension point).
 
 ## Assets & sound
 - Paths are conventional (`spritePaths(kind, id, poses)` in `js/data/asset-manifest.js`);
@@ -18,16 +20,25 @@ show the default values; the code reads them as `CONFIG.<group>.<key>`. `BASE_MO
   how-to roster) creates an Image per listed sprite; `getSprite(def, pose)` returns it once
   loaded (fallback pose → `walk` → `ready`), else `null` → emoji circle is drawn.
 - Full-body sprites: when a sprite exists, `drawEnemy`/`drawFleeing` draw it without the
-  circle, height `rpx(r) × CONFIG.sprites.heightMul` (2.8), feet at `y + rpx(r) × feetOffset`,
+  circle, height `rpx(r) × CONFIG.sprites.heightMul` (3.6), feet at `y + rpx(r) × feetOffset`,
   mirrored by `e.facing` (sign of horizontal velocity; art faces right). Poses: `walk`,
   `idle` while frozen, `kicked` while fleeing. Hit flash uses `ctx.filter = brightness(2.2)`.
+- **One image per character** is enough (the generated art is just enemy `walk.png` /
+  hero `ready.png`). `hasPose(def, pose)` tells whether a pose file exists; when it doesn't,
+  poses are faked with transforms: walk = ±4° waddle, kicked = −18° lean + squash, hero kick
+  = ready leaning +14° with an 18% lunge and 💥, lasso throw/pull = ready leaning +10°/−12°.
+- **Art pipeline** (`tools/art/README.md`): `tools/gen-art.mjs` asks agy's image-generator
+  subagent for each character (prompts in `tools/art/prompts.mjs`, style `3d`) and collects
+  the image from agy's brain folder into `art-src/` (git-ignored); `tools/chroma-key.mjs`
+  removes the green background in headless Chromium, trims, and writes 384 px PNGs to
+  `assets/`; then `node tools/build-assets.mjs`.
 - `js/audio.js`: `play(id, arg)` uses the decoded file from `SOUNDS[id].file` if loaded,
   otherwise the synth function named by `SOUNDS[id].synth`. `preloadSounds()` runs after
   the first user gesture (`unlockAudio`). `sfx.*` are thin wrappers around `play`.
 - `SOUNDS` ids: `enemy_<id>` (catch reaction, synth `catch` pitched by combo), `hero_<id>`
   (kick impact, synth `kick`), and the game sounds of `docs/prompts/sound-design.md` §3 (hit,
-  miss, catch, combo, close, power, freeze, wall, shield, sweep, wave, cleared, warn, boss,
-  leak, perk, over, record, tap), each with a synth fallback. `warn` is rate-limited
+  miss, catch, combo, close, power, freeze, shield, wave, cleared, warn, boss, leak, over,
+  record, tap), each with a synth fallback. `warn` is rate-limited
   (`CONFIG.waves.warnThrottle`).
 - Music: `playMusic('menu'|'game'|'boss')` / `stopMusic()` with looping `<audio>` elements,
   only for files in the manifest; `CONFIG.audio.musicVolume`; mute pauses it. main.js plays
@@ -44,11 +55,10 @@ index.html ──loads──> js/main.js (UI glue)
                          │      ├── js/config.js     (CONFIG: all tunables)
                          │      ├── js/data/enemies.js (roster/balance data)
                          │      ├── js/assets.js     (sprites → data/heroes.js)
-                         │      ├── js/perks.js      (upgrades + BASE_MODS)
+                         │      ├── js/perks.js      (BASE_MODS run modifiers)
                          │      ├── js/audio.js      (sfx/play → data/sounds.js)
                          │      └── js/i18n.js       (t, fmt)
                          ├── js/data/enemies.js (to build how-to tables)
-                         ├── js/perks.js      (emoji/max for the upgrade screen)
                          ├── js/audio.js      (unlock, mute)
                          └── js/i18n.js       (language switch)
 sw.js  — registered by main.js on load (not on file://)
@@ -59,15 +69,14 @@ three **hooks** passed to the constructor by `main.js`:
 
 | Hook | Called | Used for |
 |---|---|---|
-| `onHud(game)` | every frame | score, wave, combo, shields, sweep meter (main.js caches last values to avoid DOM churn) |
+| `onHud(game)` | every frame | score, wave, combo, shields; lasso: jailed, lives (main.js caches last values to avoid DOM churn) |
 | `onBanner(title, sub)` | wave start / wave clear | big centered banner text |
 | `onGameOver(summary)` | 1.1 s after a tier-1 breach | game-over screen, high score save |
-| `onPerks(ids)` | after the break following every `PERK_EVERY`-th wave | shows the upgrade screen; main.js calls `game.choosePerk(id)` |
 
 ## Game modes
 There are two **play modes**, each a `Game` instance on the same canvas (`main.js`
 `games = { classic, lasso }`). Only the one with `active = true` updates, draws and takes
-input; `setMode(m)` switches, sets `body[data-mode]` (CSS hides `.lassoOnly` / `#sweepBtn`),
+input; `setMode(m)` switches, sets `body[data-mode]` (CSS hides `.lassoOnly` in classic),
 and saves `kto-mode`. `window.__game` is always the active one.
 - **classic** = `Game` (`js/game.js`): this whole document unless stated otherwise.
 - **lasso** ("Rope 'Em!") = `LassoGame extends Game` (`js/lasso.js`), see
@@ -75,13 +84,12 @@ and saves `kto-mode`. `window.__game` is always the active one.
 
 Override points in `Game` that the lasso mode uses: `updateEffects(dt)` (cosmetics, all
 modes) / `updatePlay(dt)` (simulation), `nextWave()`, `spawn()`, `spawnPoint()`,
-`breach()`, `onPointer()`, `useSweep()`, `wavePool(n)`, `powerupKinds()`, `leakLabel()`,
+`breach()`, `onPointer()`, `wavePool(n)`, `powerupKinds()`, `leakLabel()`,
 `stealthAlpha(e)`, `drawLayer(t)` (after kicks), `drawHint(t)`, `drawBossBar()`,
 `summary()`. `e.pose` (optional) overrides the sprite pose in `drawEnemy`.
 
 `Game.hero` is the chosen hero id (`HEROES`), set by `start(heroId)`.
-`Game.mode` is one of `'menu' | 'playing' | 'paused' | 'perk' | 'over'`
-(`'perk'` = simulation stopped while the upgrade screen is open).
+`Game.mode` is one of `'menu' | 'playing' | 'paused' | 'over'`.
 - The render loop (`loop` → `update` → `render` → `onHud`) **always runs**, including
   on the menu (the map is the menu background).
 - `update()` animates particles/floaters in every mode but only simulates when
@@ -135,9 +143,7 @@ modes) / `updatePlay(dt)` (simulation), `nextWave()`, `spawn()`, `spawnPoint()`,
    (drawn by `drawWarning`); after 0.7 s it becomes `spawn(type, p, true)`.
 4. When the queue is empty **and** no enemies **and** no pending warnings remain →
    `waveCleared()` adds bonuses and sets `breakT = 2.4` s; when it runs out →
-   `afterBreak()`: on every `PERK_EVERY` (2nd) wave it sets `mode = 'perk'` and calls
-   `onPerks(perkOptions(game, 3))`; `choosePerk(id)` applies it and calls `nextWave()`.
-   Otherwise `nextWave()` directly.
+   `afterBreak()` → `nextWave()`.
 
 ## Spawning
 - `spawnPoint()`: pick a random point along `INDIA_EDGES` (length-weighted), push it
@@ -154,7 +160,7 @@ modes) / `updatePlay(dt)` (simulation), `nextWave()`, `spawn()`, `spawnPoint()`,
 - Summoners (`def.summons = { every, types }`) spawn helpers near themselves with an
   `at` point; interval shrinks `0.05 s` per wave, min 1.8 s.
 - Splitters (`def.splits = { into, n }`): `catch()` → `split(e)` spawns `n` of `into`
-  side by side, 0.1 units further from the border. Not triggered by Sweep.
+  side by side, 0.1 units further from the border.
 
 ### Enemy object
 ```js
@@ -168,7 +174,7 @@ Movement: head to `(tx,ty)`; within 0.03 switch `phase = 1` and head to `DHAKA`.
 ## Heroes, kicks and fleeing
 - Menu ▶ PLAY → `#heroSelect` (main.js `renderHeroes`), choice saved in `kto-hero`;
   "Play again" reuses it. `game.start(heroId)`.
-- Every successful hit calls `spawnKick(e, heroId, quiet)`: pushes `{hero, x, y, dirX, dirY, t, life}`
+- Every successful hit calls `spawnKick(e, heroId)`: pushes `{hero, x, y, dirX, dirY, t, life}`
   to `this.kicks` (screen px), placed behind the intruder (against the flee direction) by
   `rpx(r) + CONFIG.kick.heroOffsetPx`, and plays the hero's sound (`HEROES[id].sound || 'kick'`).
   `drawKick`: `ready` pose for `windupTime`, then `kick`; emoji + 🦶 fallback; mirrored when
@@ -178,11 +184,14 @@ Movement: head to `(tx,ty)`; within 0.03 switch `phase = 1` and head to `DHAKA`.
 - On a catch the intruder leaves `this.enemies` (can't be tapped, can't breach, doesn't
   block wave-clear) and joins `this.fleeing` (screen px) moving at `fleeSpeedPx` until it
   has travelled `fleeDistancePx` (300), fading out, with a hop, wobble, dust and the
-  `kicked` pose. Kicks and fleeing animate in every mode except `paused`/`perk`.
+  `kicked` pose. Kicks and fleeing animate in every mode except `paused`.
 - Non-final hits: knockback/dash as before + kick + small hop (`e.hop`).
-- Sweep: kick visuals cycle through all heroes (`CONFIG.kick.sweepAllHeroes`); sounds are
-  suppressed per intruder (one `sweep` sound instead).
 - Reaction sound on a catch: `play(e.def.sound)` if set, else the pitched `catch` synth.
+- **Reaction bubbles** (`CONFIG.fun`): `quip(e, force)` pushes a speech bubble
+  `{ text, x, y, t, life }` (screen px) with a random line from i18n `quips` (`quipsMain` for
+  tier 1), with chance `quipChance` and at most one per `quipCooldown`. Aged in
+  `updateEffects`, drawn by `drawQuips()` before the overlays. Classic: on every catch; lasso:
+  when a crook is roped, and forced on the Hasina win.
 
 ## Input & scoring
 - `onPointer` (pointerdown on canvas): power-ups first (30 px radius, doesn't count as
@@ -192,28 +201,25 @@ Movement: head to `(tx,ty)`; within 0.03 switch `phase = 1` and head to `DHAKA`.
   `dash` characters also jump 0.16 sideways (flipped if that lands inside BD).
   HP ≤ 0 → `catch()`.
 - `catch()`: combo (`COMBO_WINDOW` 1.5 s), `multiplier() = min(5, 1 + floor((combo−1)/5))`,
-  points × mult (sweep: 50%, no mult, no close-call, no sweep gain, no power-up drop),
-  close call `+25` if `distToPoly < CLOSE_CALL (0.12)`, sweep meter `+def.sweepGain`,
+  points × mult, close call `+25` if `distToPoly < CLOSE_CALL (0.12)`,
   power-up drop chance `POWERUP_CHANCE + mods.dropBonus` (100% for tier 1).
 - `comboLeft()` (0..1) drives the HUD combo timer bar.
-- `useSweep()`: needs `sweep ≥ 100`; deals 99 damage to everyone, 4 to tier 1.
 - `breach()`: tier 2/3 → remove, subtract `penaltyOf(def)` (floored at score 0), combo
   reset. Tier 1 → if `shield > 0`, consume one and teleport her to `home`; else
   `mode = 'over'` and call `onGameOver` after 1.1 s.
 - Stats: `this.stats` (whole run) and `this.waveStats` (for per-wave accuracy/leak bonuses).
   `summary()` builds the object passed to `onGameOver`.
 
-## Perks / run modifiers (`js/perks.js`)
+## Run modifiers (`js/perks.js`)
 `game.mods` is reset to `BASE_MODS` each run; gameplay code reads these instead of
-constants: `tapRadius` (× hit radius), `knockback` (× 0.035 push), `sweepGain`
-(× def.sweepGain), `dropBonus` (+ drop chance), `comboWindow` (s), `freezeTime`,
-`wallTime` (s). `game.perks` counts picks per id (for `max` and the `n/max` label).
-`perkOptions()` shuffles the perks that are under `max` and pass `available(game)`.
+constants: `tapRadius` (× hit radius), `knockback` (× 0.035 push), `dropBonus` (+ drop
+chance), `comboWindow` (s), `freezeTime` (s). The upgrade screen that changed them was
+removed (2026-11-12, "keep it simple for all ages").
 
 ## Power-ups
 `POWERUPS` in `js/data/enemies.js` holds emoji/colour only; effects are hard-coded in
-`Game.collect()`: freeze → `freezeT = mods.freezeTime` (4), wall → `wallT = mods.wallTime` (7; speed × 0.4), shield →
-`+1` up to `MAX_SHIELD` (3; not dropped when full), charge → sweep `+40`. Power-ups
+`Game.collect()`. Only two exist (2026-11-12): freeze → `freezeT = mods.freezeTime` (4 s),
+shield → `+1` up to `MAX_SHIELD` (3; not dropped when full). Power-ups
 live 6 s and blink in the last 1.5 s. Adding a power-up = entry in `POWERUPS` + branch
 in `collect()` + `pu.*`, `puName.*`, `puDesc.*` strings.
 
@@ -255,11 +261,11 @@ Tunables: `CONFIG.lasso`; rules in `docs/PLAN-lasso.md`. `wave` mirrors `level`.
 ## Rendering order (`render()`)
 India background → Myanmar → sea gradient → labels → Bangladesh fill + red flag disc
 (clipped) → border outline (India border glows mint / pulses red when any enemy is
-within `DANGER`, orange & thick while wall is active) → Dhaka dot + label → power-ups →
+within `DANGER`) → Dhaka dot + label → power-ups →
 spawn warnings (`drawWarning`) → fleeing intruders (`drawFleeing`) → enemies (`drawEnemy`: danger ring, tier-1 gold aura, shadow, body/sprite/emoji, frozen
 tint, HP bar if maxHp>1, name tag for tier ≤ 2) → kicks → `drawLayer` (mode extras) →
 `drawHint` (first-catch "TAP!" hint) → breach
-marker → particles → floaters → full-screen overlays (freeze tint, sweep flash, leak
+marker → particles → floaters → full-screen overlays (freeze tint, flash, leak
 flash, `drawBossBar` (gold HP bar under the HUD while tier 1 is alive), red vignette
 when tier 1 is near the border). Hero kicks (`drawKick`) are drawn right after the enemies. Screen shake translates the
 whole frame. DPR is capped at 2.

@@ -10,6 +10,9 @@ const cache = new Map(); // path -> HTMLImageElement
 
 export const hasAsset = (path) => known.has(path);
 
+/** True when the character has its own art file for exactly this pose. */
+export const hasPose = (def, pose) => hasAsset(def?.sprites?.[pose]);
+
 /**
  * Create an Image per sprite path that is in the manifest (cached by path).
  * `onLoad` (optional) runs after each image loads, so HTML built from sprites

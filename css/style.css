@@ -39,17 +39,6 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   border: 1px solid var(--line); background: rgba(0,0,0,.35); font-size: 18px;
 }
 
-#sweepBtn {
-  position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
-  bottom: calc(16px + var(--safe-b)); width: min(260px, 70vw); height: 54px;
-  border-radius: 27px; border: 2px solid rgba(255,225,90,.4); background: rgba(0,0,0,.55);
-  overflow: hidden; font-weight: 800; letter-spacing: .1em; opacity: .7;
-}
-#sweepFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #a87b00, #ffe15a); transition: width .2s; }
-#sweepBtn .lbl { position: relative; text-shadow: 0 1px 2px #000; }
-#sweepBtn.ready { opacity: 1; border-color: #ffe15a; animation: pulse .8s infinite alternate; }
-@keyframes pulse { to { box-shadow: 0 0 24px #ffe15a; transform: translateX(-50%) scale(1.05); } }
-
 /* ---------- Banner ---------- */
 #banner {
   position: fixed; z-index: 6; left: 0; right: 0; top: 22%; text-align: center;
@@ -119,13 +108,6 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
 .table b { color: #ffe15a; font-variant-numeric: tabular-nums; }
 .table b small { font-size: 11px; opacity: .7; font-weight: 400; }
 
-.perks { display: flex; flex-direction: column; gap: 8px; }
-.panel button.perkBtn { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; }
-.perkBtn .face { font-size: 28px; flex: none; }
-.perkBtn .nm { display: flex; flex-direction: column; }
-.perkBtn .nm small { font-weight: 400; opacity: .7; font-size: 13px; }
-.perkBtn .lvl { margin-left: auto; font-size: 12px; opacity: .6; }
-
 .bigscore { font-size: 56px; font-weight: 900; color: #ffe15a; font-variant-numeric: tabular-nums; line-height: 1; }
 .record { font-weight: 800; color: var(--mint); animation: pulse2 .7s infinite alternate; }
 @keyframes pulse2 { to { transform: scale(1.08); } }
@@ -149,6 +131,5 @@ kbd { background: rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; fon
 }
 
 /* Mode-specific UI: body[data-mode] is set by main.js */
-body[data-mode="classic"] .lassoOnly { display: none; }
-body[data-mode="lasso"] #sweepBtn { display: none; }
+body[data-mode="classic"] .lassoOnly, body[data-mode="classic"] #hud .lassoOnly { display: none; } /* #hud .stat has an id selector */
 #playLassoBtn { background: linear-gradient(180deg, #d9a85b, #a8742f); border-color: #e7b86a; box-shadow: 0 6px 20px rgba(201,162,107,.35); }

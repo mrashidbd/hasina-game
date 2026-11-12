@@ -5,11 +5,11 @@ import {
   CHARACTERS, POWERUPS, MAIN_ID, penaltyOf, isMainWave,
 } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
-import { PERKS, BASE_MODS, perkOptions } from './perks.js';
+import { BASE_MODS } from './perks.js';
 import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
-import { getSprite } from './assets.js';
+import { getSprite, hasPose } from './assets.js';
 
 export const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
@@ -27,7 +27,7 @@ export class Game {
   constructor(canvas, hooks = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.hooks = hooks; // onHud, onBanner, onGameOver, onPerks
+    this.hooks = hooks; // onHud, onBanner, onGameOver
     this.mode = 'menu';
     this.active = true; // only the active mode's game draws and takes input (main.js)
     this.insets = { top: CONFIG.layout.hudTop, bottom: CONFIG.layout.hudBottom };
@@ -47,20 +47,19 @@ export class Game {
     this.combo = 0;
     this.bestCombo = 0;
     this.lastCatch = -10;
-    this.sweep = 0;
     this.shield = 0;
     this.freezeT = 0;
-    this.wallT = 0;
     this.enemies = [];
     this.particles = [];
     this.floaters = [];
     this.kicks = []; // on-screen kick animations (screen px)
     this.fleeing = []; // caught intruders running away (screen px)
+    this.quips = []; // reaction speech bubbles (screen px): { text, x, y, t, life }
     this.powerups = [];
     this.queue = [];
     this.warnings = []; // telegraphed spawns: { type, p, t }
-    this.mods = { ...BASE_MODS }; // run modifiers changed by perks
-    this.perks = {};              // perk id -> times taken
+    this.mods = { ...BASE_MODS }; // run modifiers (values in js/perks.js)
+    this.lastQuipT = -10; // game time of the last new bubble (cooldown gate)
     this.spawnT = 0;
     this.breakT = 0;
     this.shake = 0;
@@ -185,23 +184,8 @@ export class Game {
     this.breakT = CONFIG.waves.breakTime;
   }
 
-  /** After the break: offer an upgrade every CONFIG.perks.every waves, otherwise go on. */
-  afterBreak() {
-    const options = this.wave % CONFIG.perks.every === 0 ? perkOptions(this, CONFIG.perks.choices) : [];
-    if (!options.length || !this.hooks.onPerks) { this.nextWave(); return; }
-    this.mode = 'perk';
-    this.hooks.onPerks(options);
-  }
-
-  choosePerk(id) {
-    if (this.mode !== 'perk' || !PERKS[id]) return;
-    PERKS[id].apply(this);
-    this.perks[id] = (this.perks[id] || 0) + 1;
-    sfx.perk();
-    this.mode = 'playing';
-    this.last = performance.now();
-    this.nextWave();
-  }
+  /** After the break between waves, the next wave starts. */
+  afterBreak() { this.nextWave(); }
 
   /** 0..1, how much of the combo window is left (for the HUD timer). */
   comboLeft() {
@@ -319,7 +303,7 @@ export class Game {
     this.damage(best, 1);
   }
 
-  damage(e, amount, viaSweep = false, heroId = null) {
+  damage(e, amount, heroId = null) {
     e.hp -= amount;
     e.hitFlash = CONFIG.combat.hitFlashTime;
     if (e.hp > 0) {
@@ -334,16 +318,16 @@ export class Game {
         e.x += (-dy / d) * CONFIG.combat.dash * side; e.y += (dx / d) * CONFIG.combat.dash * side;
         if (pointInPoly(BD, e.x, e.y)) { e.x -= (-dy / d) * CONFIG.combat.dash * 2 * side; e.y -= (dx / d) * CONFIG.combat.dash * 2 * side; }
       }
-      this.spawnKick(e, heroId, viaSweep);
+      this.spawnKick(e, heroId);
       e.hop = 1; // little hop while being kicked back
       this.burst(e.x, e.y, e.def.color, 6);
       return;
     }
-    this.catch(e, viaSweep, heroId);
+    this.catch(e, heroId);
   }
 
-  catch(e, viaSweep = false, heroId = null) {
-    this.spawnKick(e, heroId, viaSweep);
+  catch(e, heroId = null) {
+    this.spawnKick(e, heroId);
     this.enemies.splice(this.enemies.indexOf(e), 1);
     this.spawnFleeing(e);
     const oldMult = this.multiplier();
@@ -351,10 +335,10 @@ export class Game {
     this.lastCatch = this.time;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     const mult = this.multiplier();
-    let pts = viaSweep ? Math.round(e.def.points * CONFIG.scoring.sweepPointsFactor) : e.def.points * mult;
+    let pts = e.def.points * mult;
     const near = distToPoly(BD, e.x, e.y);
     let label = `+${fmt(pts)}`;
-    const closeCall = !viaSweep && near < CONFIG.scoring.closeCallDistance;
+    const closeCall = near < CONFIG.scoring.closeCallDistance;
     if (closeCall) {
       pts += CONFIG.scoring.closeCallBonus; this.stats.closeCalls++; label = `+${fmt(pts)} ${tr('closeCall')}`;
     }
@@ -362,17 +346,15 @@ export class Game {
     if (isMain) this.stats.mains++;
     this.score += pts;
     this.stats.caught++;
-    if (!viaSweep) this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + e.def.sweepGain * this.mods.sweepGain);
     this.floater(this.sx(e.x), this.sy(e.y) - 20, label, mult > 1 ? '#ffe15a' : '#ffffff', isMain ? 1.6 : 1);
     this.burst(e.x, e.y, e.def.color, isMain ? 40 : 14);
-    // A sweep plays one big sound instead of one reaction per intruder.
-    // The combo is passed through so the synth fallback keeps its pitch.
-    if (!viaSweep) { if (e.def.sound) play(e.def.sound, this.combo); else play('catch', this.combo); }
-    if (!viaSweep && mult > oldMult) sfx.combo();
+    if (e.def.sound) play(e.def.sound, this.combo); else play('catch', this.combo);
+    if (mult > oldMult) sfx.combo();
     if (closeCall) sfx.close();
     if (isMain) { this.shake = 0.4; navigator.vibrate?.([40, 30, 40]); }
-    if (!viaSweep && Math.random() < (isMain ? 1 : CONFIG.powerups.dropChance + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
-    if (e.def.splits && !viaSweep) this.split(e);
+    if (Math.random() < (isMain ? 1 : CONFIG.powerups.dropChance + this.mods.dropBonus)) this.dropPowerup(e.x, e.y);
+    if (e.def.splits) this.split(e);
+    this.quip(e); // "Ouch!" — the caught one gets a word (CONFIG.fun)
   }
 
   /** Splitters break into smaller intruders, pushed back a little from the border. */
@@ -400,8 +382,8 @@ export class Game {
     return { x: dx / len, y: dy / len };
   }
 
-  /** Hero pops up behind the intruder and kicks it; plays the hero's kick sound unless quiet. */
-  spawnKick(e, heroId, quiet = false) {
+  /** Hero pops up behind the intruder and kicks it; plays the hero's kick sound. */
+  spawnKick(e, heroId) {
     const hero = heroId && HEROES[heroId] ? heroId : this.hero;
     const dir = this.fleeVector(e);
     const dist = this.rpx(e.r) + CONFIG.kick.heroOffsetPx;
@@ -413,7 +395,7 @@ export class Game {
       t: 0, life: CONFIG.kick.heroShowTime,
     });
     this.burst(e.x, e.y, '#ffe15a', 8);
-    if (!quiet) play(HEROES[hero].sound || 'kick');
+    play(HEROES[hero].sound || 'kick');
   }
 
   /** Caught intruder runs back towards India (screen px) and fades away. */
@@ -429,21 +411,6 @@ export class Game {
 
   multiplier() { return Math.min(CONFIG.scoring.multiplierMax, 1 + Math.floor((this.combo - 1) / CONFIG.scoring.multiplierStep)); }
 
-  useSweep() {
-    if (this.mode !== 'playing' || this.sweep < CONFIG.scoring.sweepMax) return;
-    this.sweep = 0;
-    this.flash = 0.5;
-    sfx.sweep();
-    navigator.vibrate?.(60);
-    const ids = Object.keys(HEROES);
-    let i = 0;
-    for (const e of [...this.enemies]) {
-      const heroId = CONFIG.kick.sweepAllHeroes ? ids[i++ % ids.length] : null;
-      if (e.def.tier === 1) this.damage(e, CONFIG.powerups.sweepMainDamage, true, heroId);
-      else this.damage(e, CONFIG.powerups.sweepDamage, true, heroId);
-    }
-  }
-
   dropPowerup(x, y) {
     const kinds = this.powerupKinds().filter((k) => k !== 'shield' || this.shield < CONFIG.powerups.maxShield);
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
@@ -457,13 +424,10 @@ export class Game {
     this.powerups.splice(this.powerups.indexOf(pu), 1);
     const def = POWERUPS[pu.kind];
     if (pu.kind === 'freeze') this.freezeT = this.mods.freezeTime;
-    if (pu.kind === 'wall') this.wallT = this.mods.wallTime;
     if (pu.kind === 'shield') this.shield = Math.min(CONFIG.powerups.maxShield, this.shield + 1);
-    if (pu.kind === 'charge') this.sweep = Math.min(CONFIG.scoring.sweepMax, this.sweep + CONFIG.powerups.chargeAmount);
     this.floater(this.sx(pu.x), this.sy(pu.y) - 24, tr(`pu.${pu.kind}`), def.color, 1.2);
     this.burst(pu.x, pu.y, def.color, 16);
     if (pu.kind === 'freeze') sfx.freeze();
-    else if (pu.kind === 'wall') sfx.wall();
     else if (pu.kind === 'shield') sfx.shield();
     else sfx.power();
   }
@@ -510,7 +474,6 @@ export class Game {
   summary() {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
-      perks: Object.values(this.perks).reduce((a, b) => a + b, 0),
       accuracy: this.stats.taps ? Math.round((this.stats.hits / this.stats.taps) * 100) : 0,
       intruderType: this.breachAt?.type ?? '',
     };
@@ -535,9 +498,13 @@ export class Game {
     for (const f of this.floaters) { f.y -= 40 * dt; f.life -= dt; }
     this.floaters = this.floaters.filter((f) => f.life > 0);
 
+    // Reaction bubbles age and drift up in every mode (like particles).
+    for (const q of this.quips) { q.t += dt; q.y -= 20 * dt; }
+    this.quips = this.quips.filter((q) => q.t < q.life);
+
     // Kick visuals and fleeing intruders: animate even when not playing (like
-    // particles), but freeze while the pause / upgrade screens are open.
-    if (this.mode !== 'paused' && this.mode !== 'perk') {
+    // particles), but freeze while the pause screen is open.
+    if (this.mode !== 'paused') {
       for (const k of this.kicks) k.t += dt;
       this.kicks = this.kicks.filter((k) => k.t < k.life);
       for (const f of this.fleeing) {
@@ -551,13 +518,12 @@ export class Game {
   updatePlay(dt) {
     this.time += dt;
     this.freezeT = Math.max(0, this.freezeT - dt);
-    this.wallT = Math.max(0, this.wallT - dt);
     if (this.time - this.lastCatch > this.mods.comboWindow) this.combo = 0;
 
     // waves
     if (this.breakT > 0) {
       this.breakT -= dt;
-      if (this.breakT <= 0) { this.afterBreak(); if (this.mode !== 'playing') return; }
+      if (this.breakT <= 0) this.afterBreak();
     } else if (this.queue.length) {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
@@ -581,7 +547,6 @@ export class Game {
 
     // intruders
     const frozen = this.freezeT > 0;
-    const slow = this.wallT > 0 ? CONFIG.powerups.wallSlow : 1;
     for (const e of [...this.enemies]) {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
@@ -592,7 +557,7 @@ export class Game {
       const dx = tx - e.x, dy = ty - e.y;
       const d = Math.hypot(dx, dy) || 1;
       if (e.phase === 0 && d < CONFIG.combat.phaseSwitchDistance) e.phase = 1;
-      const spd = e.speed * slow;
+      const spd = e.speed;
       let vx = (dx / d) * spd, vy = (dy / d) * spd;
       if (e.def.wobble) {
         const w = Math.sin(e.t * CONFIG.combat.wobbleFrequency + e.seed) * spd * CONFIG.combat.wobbleAmplitude;
@@ -637,6 +602,26 @@ export class Game {
 
   floater(x, y, text, color, scale = 1, small = false) {
     this.floaters.push({ x, y, text, color, life: 0.9, scale: small ? 0.7 : scale });
+  }
+
+  /**
+   * A caught character complains in a little speech bubble just above its
+   * head. Chances and timing come from CONFIG.fun; tier 1 (Hasina) uses the
+   * `quipsMain` lines. `force` skips both the chance and the cooldown.
+   */
+  quip(e, force = false) {
+    const F = CONFIG.fun;
+    if (!force) {
+      if (this.time - this.lastQuipT < F.quipCooldown) return;
+      if (Math.random() >= (e.def.tier === 1 ? F.mainQuipChance : F.quipChance)) return;
+    }
+    this.lastQuipT = this.time;
+    const lines = tr(e.def.tier === 1 ? 'quipsMain' : 'quips');
+    if (!Array.isArray(lines) || !lines.length) return;
+    const r = this.rpx(e.def.radius ?? 0.1);
+    // Tail tip sits a little above the sprite's head (kept below the HUD).
+    const y = Math.max(this.sy(e.y) - r * CONFIG.sprites.heightMul - 4, this.insets.top + 16);
+    this.quips.push({ text: lines[Math.floor(Math.random() * lines.length)], x: this.sx(e.x), y, t: 0, life: F.quipTime });
   }
 
   // ---------------------------------------------------------------- render
@@ -698,8 +683,8 @@ export class Game {
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 1.5;
     ctx.stroke(this.bdPath);
-    ctx.lineWidth = this.wallT > 0 ? 7 : 3;
-    ctx.strokeStyle = this.wallT > 0 ? '#e0894a' : danger ? `rgba(255,${80 + 60 * Math.sin(t * 12)},80,1)` : '#7cffb2';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = danger ? `rgba(255,${80 + 60 * Math.sin(t * 12)},80,1)` : '#7cffb2';
     ctx.shadowColor = ctx.strokeStyle;
     ctx.shadowBlur = 12;
     ctx.stroke(this.indiaBorder);
@@ -783,6 +768,9 @@ export class Game {
     }
     ctx.globalAlpha = 1;
 
+    // reaction speech bubbles (before the full-screen overlays)
+    this.drawQuips();
+
     // overlays
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (this.freezeT > 0) {
@@ -824,6 +812,52 @@ export class Game {
     ctx.strokeText(text, x, y);
     ctx.fillStyle = '#ffe15a';
     ctx.fillText(text, x, y);
+  }
+
+  /**
+   * Reaction speech bubbles: a white rounded bubble with a small tail
+   * pointing down at the speaker. Pops in over 0.1 s, fades out over the
+   * last 0.25 s of its life.
+   */
+  drawQuips() {
+    const { ctx } = this;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 13px system-ui, sans-serif';
+    for (const q of this.quips) {
+      const grow = Math.min(1, q.t / 0.1);
+      const fade = clamp((q.life - q.t) / 0.25, 0, 1);
+      const scale = 0.6 + 0.4 * grow;
+      const bw = ctx.measureText(q.text).width + 16;
+      const bh = 24;
+      const x = clamp(q.x, bw / 2 + 4, this.w - bw / 2 - 4); // keep it on screen
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(x, q.y); // (x, y) = tip of the tail, under the bubble
+      ctx.scale(scale, scale);
+      ctx.beginPath();
+      ctx.moveTo(-bw / 2 + 7, -bh);
+      ctx.arcTo(bw / 2, -bh, bw / 2, 0, 7);
+      ctx.arcTo(bw / 2, 0, -bw / 2, 0, 7);
+      ctx.arcTo(-bw / 2, 0, -bw / 2, -bh, 7);
+      ctx.arcTo(-bw / 2, -bh, bw / 2, -bh, 7);
+      ctx.closePath();
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); // tail
+      ctx.moveTo(-5, -2);
+      ctx.lineTo(5, -2);
+      ctx.lineTo(0, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#1c1f24';
+      ctx.fillText(q.text, 0, -bh / 2);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawWarning(w, t) {
@@ -890,7 +924,8 @@ export class Game {
     const bob = Math.sin(e.t * 10 + e.seed) * (this.freezeT > 0 ? 0 : 2);
     const frozen = this.freezeT > 0;
     // Frozen uses the idle pose (getSprite falls back to walk).
-    const sprite = getSprite(e.def, e.pose ?? (frozen ? 'idle' : 'walk'));
+    const pose = e.pose ?? (frozen ? 'idle' : 'walk');
+    const sprite = getSprite(e.def, pose);
 
     if (sprite) {
       // Full-body, feet-anchored, no coloured circle. Art faces right.
@@ -900,6 +935,13 @@ export class Game {
       ctx.save();
       ctx.translate(x, feetY);
       if ((e.facing ?? 1) < 0) ctx.scale(-1, 1);
+      if (pose === 'kicked' && !hasPose(e.def, 'kicked')) {
+        // One image per character: fake the kicked pose with a backward lean + squash.
+        ctx.rotate(-18 * Math.PI / 180);
+        ctx.scale(1.06, 0.92);
+      } else if (pose === 'walk') {
+        ctx.rotate(Math.sin(e.t * 8 + e.seed) * 4 * Math.PI / 180); // gentle waddle
+      }
       if (e.hitFlash > 0 && 'filter' in ctx) ctx.filter = 'brightness(2.2)';
       ctx.drawImage(sprite, -h / 2, -h, h, h);
       if ('filter' in ctx) ctx.filter = 'none';
@@ -967,7 +1009,9 @@ export class Game {
     const pop = 0.6 + 0.4 * Math.min(1, k.t / 0.08);
     const size = K.heroSizePx * pop;
     const winding = k.t < K.windupTime;
-    const pose = winding ? 'ready' : 'kick';
+    const kickArt = hasPose(def, 'kick');
+    const fakeKick = !winding && !kickArt; // one image per hero: fake it with the ready pose
+    const pose = winding || !kickArt ? 'ready' : 'kick';
     const sprite = getSprite(def, pose);
     const cx = k.x + k.dirX * size * 0.55;
     const cy = k.y + k.dirY * size * 0.55;
@@ -975,8 +1019,10 @@ export class Game {
     ctx.globalAlpha = alpha;
     ctx.save();
     ctx.translate(k.x, k.y);
+    if (fakeKick) ctx.translate(k.dirX * size * 0.18, k.dirY * size * 0.18); // lunge at the intruder
     if (sprite) {
       if (k.dirX < 0) ctx.scale(-1, 1); // sprites face right
+      if (fakeKick) ctx.rotate(14 * Math.PI / 180); // lean into the kick
       ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     } else {
       const r = size / 2;
@@ -1009,6 +1055,10 @@ export class Game {
         ctx.lineTo(cx + Math.cos(ang) * (size * 0.22 + len), cy + Math.sin(ang) * (size * 0.22 + len));
         ctx.stroke();
       }
+      if (fakeKick) { // no kick art: a small bang where the foot lands
+        ctx.font = `${Math.round(size * 0.5)}px ${EMOJI_FONT}`;
+        ctx.fillText('💥', cx, cy);
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -1023,6 +1073,7 @@ export class Game {
     const hopT = Math.min(1, f.traveled / (K.fleeSpeedPx * 0.25));
     const hop = hopT < 1 ? Math.sin(hopT * Math.PI) * K.fleeHopPx : 0;
     const tilt = Math.sin(f.traveled * 0.05 + f.spin) * K.fleeWobbleDeg * Math.PI / 180;
+    const kickedArt = hasPose(def, 'kicked');
     const sprite = getSprite(def, 'kicked');
 
     ctx.globalAlpha = alpha;
@@ -1044,6 +1095,11 @@ export class Game {
       // Full-body, feet-anchored, no coloured circle (kicked pose).
       const S = CONFIG.sprites;
       const h = r * S.heightMul;
+      if (!kickedArt) {
+        // One image per character: fake the kicked pose with a backward lean + squash.
+        ctx.rotate(-18 * Math.PI / 180);
+        ctx.scale(1.06, 0.92);
+      }
       ctx.drawImage(sprite, -h / 2, r * S.feetOffset - h, h, h);
     } else {
       ctx.fillStyle = def.color;

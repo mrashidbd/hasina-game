@@ -67,8 +67,6 @@ export const CONFIG = {
     sharpshooterPerWave: 25, // points per wave, sharpshooter bonus (bonus = perWave·n)
     sharpshooterAccuracy: 0.9, // ratio, accuracy needed for the sharpshooter bonus
     sealedPerWave: 30, // points per wave, no-leaks bonus (bonus = perWave·n)
-    sweepPointsFactor: 0.5, // multiplier, sweep catches give this fraction of points
-    sweepMax: 100, // points, sweep meter maximum
   },
   input: {
     hitRadiusMultiplier: 1.25, // multiplier, expands the enemy radius for taps
@@ -92,15 +90,6 @@ export const CONFIG = {
     blinkTime: 1.5, // s, power-ups blink during their last this-many seconds
     maxShield: 3, // count, maximum shields held
     freezeTime: 4, // s, freeze duration
-    wallTime: 7, // s, border wall duration
-    wallSlow: 0.4, // multiplier, speed while the wall is active
-    chargeAmount: 40, // points, sweep charge from the charge power-up
-    sweepMainDamage: 4, // damage, sweep damage dealt to the main target
-    sweepDamage: 99, // damage, sweep damage dealt to regular intruders
-  },
-  perks: {
-    every: 2, // waves, offer an upgrade after every Nth cleared wave
-    choices: 3, // count, number of upgrade choices offered
   },
   kick: {
     heroShowTime: 0.35, // s, hero stays on screen per kick
@@ -113,11 +102,17 @@ export const CONFIG = {
     fleeHopPx: 18, // px, upward hop at the start of the flee
     fleeWobbleDeg: 12, // deg, fleeing tilt/wobble amplitude
     fleeFade: true, // fade out while fleeing
-    sweepAllHeroes: true, // bool, sweep kicks cycle through all heroes
   },
   sprites: {
-    heightMul: 2.8, // multiplier, full-body sprite height = rpx(r) × heightMul
+    heightMul: 3.6, // multiplier (tuned 2026-11-12 for the generated 3D art), full-body sprite height = rpx(r) × heightMul
     feetOffset: 0.9, // multiplier, feet sit at y + rpx(r) × feetOffset below the centre
+  },
+  // Funny reaction bubbles ("Ouch!") over caught characters.
+  fun: {
+    quipChance: 0.45,  // chance a caught crook says something
+    quipTime: 1.2,     // s on screen
+    quipCooldown: 0.8, // s, at most one new bubble per this interval
+    mainQuipChance: 1, // Hasina always says something
   },
   audio: {
     musicVolume: 0.35, // volume, music track volume
@@ -170,6 +165,6 @@ export const CONFIG = {
     mainCooldown: 20,       // s before she comes back
     mainPoints: 1000,
     winBonusPerLife: 500,
-    powerups: ['freeze', 'wall', 'shield'],
+    powerups: ['freeze', 'shield'],
   },
 };

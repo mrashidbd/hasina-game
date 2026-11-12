@@ -3,6 +3,33 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-12 — simpler game, reaction bubbles, automated 3D art (branch `lasso`)
+- **The user's goal:** fun for all ages, not complex. Decisions: keep only ❄️ Freeze + 🛡️ Shield;
+  remove the classic upgrade (perk) screen and the Sweep button; add funny reaction bubbles;
+  keep both modes equal on the menu; the art style is 3D toy figures.
+- **Code (opencode + GLM-5.3, reviewed by Claude):**
+  - removed Border Wall, Charge, Sweep and perks everywhere (code, config, i18n, CSS, sounds);
+  - `quip()` / `drawQuips()` with `CONFIG.fun` and 14 + 6 lines in en/bn;
+  - `hasPose()` and transform-faked poses, so one image per character is enough. SW `kto-v11`.
+- **Art pipeline (GLM-5.3 tools, run by Claude):**
+  - `tools/gen-art.mjs` drives agy's image-generator subagent (no permission prompts) and
+    collects the image from agy's brain folder;
+  - `tools/chroma-key.mjs` keys out the green screen in headless Chromium and writes
+    384 px PNGs;
+  - prompts in `tools/art/prompts.mjs` (no names, no likeness).
+- **First batch:** 10 enemies + the farmer generated and keyed cleanly. The agy image quota
+  then ran out (`QUOTA_EXHAUSTED`, reset 13:13 UTC). The other 10 (shohag, saddam, murad,
+  ferdous, mahi, somrat, riyaz, studentM, studentF, common) are queued to run after the
+  reset; re-running `gen-art` skips what exists.
+- **Claude's fixes:**
+  - classic HUD showed the lasso stats (CSS specificity: `#hud .stat` beat `.lassoOnly`);
+  - `CONFIG.sprites.heightMul` 2.8 → 3.6 for the new art;
+  - the asset report no longer expects wall/sweep/perk sounds;
+  - `tools/gen-art.mjs --model`;
+  - the CDP test driver moved into the repo as `tools/cdp.mjs`.
+- Tested headless: both modes with real art (desktop + phone), only freeze/shield drop, the
+  wave break goes straight to the next wave, bubbles show, no page errors.
+
 ## 2026-11-10 — Rope 'Em! redesign v2 (branch `lasso`)
 - After playing v1, the user changed the concept:
   - crooks lurk **outside** Bangladesh (on Indian land, fast and erratic for tier 2 and

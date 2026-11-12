@@ -32,7 +32,7 @@ There is no test suite. Quick syntax check of every module:
 for f in js/*.js sw.js; do node --check "$f"; done
 ```
 In the browser console, `window.__game` is the live `Game` instance (e.g.
-`__game.sweep = 100`, `__game.shield = 3`, `__game.wave = 11; __game.nextWave()`,
+`__game.shield = 3`, `__game.wave = 11; __game.nextWave()`,
 `__game.spawn('hasina')`, `__game.wave = 4; __game.waveCleared()` → upgrade screen).
 `__game` is the game of the active mode; in Rope 'Em! mode try `__game.locked = 12`
 (Hasina gets scheduled), `__game.startSneak()`, `__game.lives = 1`, `__game.mainT = 29`.
@@ -46,12 +46,12 @@ Application → "Update on reload", otherwise you may see the cached old version
 ## File map
 | File | Role |
 |---|---|
-| `index.html` | All screens (menu, how-to, pause, game over), HUD, sweep button. Static text uses `data-i18n="key"` |
+| `index.html` | All screens (menu, how-to, pause, game over), HUD. Static text uses `data-i18n="key"` |
 | `css/style.css` | Styling, responsive, safe-area insets |
 | `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), share, keyboard, PWA install, SW registration, renders how-to tables from data |
 | `js/game.js` | `Game` class (classic mode): waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
 | `js/lasso.js` | `LassoGame extends Game`: the "Rope 'Em!" mode (lurkers outside BD, hero orbit + chase, rope, jail, sneak-ins, Hasina = win). Tunables `CONFIG.lasso`; design `docs/PLAN-lasso.md` |
-| `js/config.js` | **`CONFIG`: every global tunable** (layout, spawn, waves, scoring, input, combat, power-ups, perks, kick) with units |
+| `js/config.js` | **`CONFIG`: every global tunable** (layout, spawn, waves, scoring, input, combat, power-ups, kick, sprites, audio, fun, lasso) with units |
 | `js/data/enemies.js` | **Roster + per-character balance**: `TIERS`, `CHARACTERS` (stats, behaviours, `sprites`, `sound`), `POWERUPS`, `MAIN_ID`, `isMainWave` |
 | `js/data/heroes.js` | `HEROES`: the 4 self characters (sprites/sound; gameplay use comes in plan phase D) |
 | `js/data/sounds.js` | `SOUNDS`: sound id → optional `file` + `synth` fallback + volume |
@@ -59,7 +59,9 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `js/data/asset-manifest.js` | **Generated** list of art/sound files present in `assets/` + `spritePaths()`. Run `node tools/build-assets.mjs` after adding files |
 | `assets/` | Art (`enemies/<id>/`, `heroes/<id>/`), sounds (`sfx/enemies|heroes|game/`), music. Layout in `assets/README.md`, prompts in `docs/prompts/` |
 | `tools/build-assets.mjs` | Scans `assets/`, writes the manifest, reports missing files per character |
-| `js/perks.js` | Between-wave upgrades: `BASE_MODS` (per-run modifiers), `PERKS`, `perkOptions()` |
+| `tools/gen-art.mjs`, `tools/chroma-key.mjs`, `tools/art/` | **Automated art**: agy image-generator → `art-src/` (git-ignored) → green-screen removal in headless Chromium → `assets/`. See `tools/art/README.md` |
+| `tools/cdp.mjs` | Headless-Chromium driver for smoke tests/screenshots: `SHOTS=<dir> node tools/cdp.mjs <script.mjs>` |
+| `js/perks.js` | `BASE_MODS`: per-run modifiers copied to `game.mods` (the upgrade screen was removed 2026-11-12) |
 | `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |
 | `js/data/map-bd.js` | **Generated** map data (Natural Earth 10m). Don't edit; run `tools/build-map.mjs` |
 | `tools/build-map.mjs` | Node script: Natural Earth GeoJSON → `js/data/map-bd.js` (+ optional preview SVG). See `tools/README.md` |
@@ -75,11 +77,11 @@ Application → "Update on reload", otherwise you may see the cached old version
    `fmt()` (or pass numbers as `t()` vars, which are auto-formatted).
 3. **Balance lives in data, not code.** Character stats → `js/data/enemies.js`. Global
    tunables → `CONFIG` in `js/config.js` (never add magic numbers to `game.js`; rendering-only
-   pixel/colour values are the exception). Values a perk can change → `BASE_MODS` in
+   pixel/colour values are the exception). Per-run modifiers → `BASE_MODS` in
    `js/perks.js` (read via `game.mods.*`, never a constant). Wave formulas → `Game.nextWave()`.
 4. **New character** = add entry in `CHARACTERS` + `char.<id>` and `trait.<id>` in both
    languages. The how-to roster table and wave mix pick it up automatically.
-   **New perk** = entry in `PERKS` + `perkName.<id>` / `perkDesc.<id>` in both languages.
+   Keep it simple: the user wants a fun game for all ages (2 power-ups, no upgrade screens).
 5. **Assets**: paths are by convention (`assets/enemies/<id>/<pose>.png`,
    `assets/sfx/enemies/<id>.mp3`, …; see `docs/prompts/`). Drop files in, then run
    `node tools/build-assets.mjs`; only manifest-listed files are requested, everything else
@@ -102,6 +104,11 @@ sends larger corrections back to the tools.
 - **Default coder (user, 2026-11-10): GLM-5.3 via the user's Z.AI Coding Plan:**
   `opencode run -m zai-coding-plan/glm-5.3 --auto --title "<t>" "<brief>"`. (The
   `console-z-ai/glm-5.3` id fails with an auth error; `crouton-alpha-free` is gone.)
+- **agy is used for image generation** (`node tools/gen-art.mjs`): its image-generator
+  subagent needs no permission, and the script picks the file up from
+  `~/.gemini/antigravity-cli/brain/<conversation>/`. The image quota is limited per day
+  (2026-11-12: about 11 images, then `QUOTA_EXHAUSTED` with a reset time in
+  `~/.gemini/antigravity-cli/cli.log`); rerun the script later and it skips what exists.
 - `agy -p "<brief>" --model claude-opus-4-6-thinking --mode accept-edits`; when its limit
   is reached use `--model gemini-3.8-flash-high`. **Caveat (2026-11-09):** in print mode
   agy stops at its first permission prompt (even listing a folder), `--mode auto` isn't

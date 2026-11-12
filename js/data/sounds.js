@@ -10,9 +10,9 @@ const HERO_IDS = Object.keys(HEROES);
 // Game sounds (sound-design.md §3) and the closest existing synth fallback.
 const GAME_SYNTH = {
   hit: 'hit', miss: 'miss', catch: 'catch', combo: 'catch', close: 'power',
-  power: 'power', freeze: 'power', wall: 'power', shield: 'shield',
-  sweep: 'sweep', wave: 'wave', cleared: 'wave', warn: 'warn',
-  boss: 'boss', leak: 'leak', perk: 'power', over: 'over',
+  power: 'power', freeze: 'power', shield: 'shield',
+  wave: 'wave', cleared: 'wave', warn: 'warn',
+  boss: 'boss', leak: 'leak', over: 'over',
   record: 'wave', tap: 'tap',
 };
 

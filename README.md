@@ -39,7 +39,7 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 | `js/data/enemies.js` | **Roster and balance**: tiers, penalties, emoji, sprites, HP, speed, points, behaviours; power-ups |
 | `js/data/heroes.js` / `js/data/sounds.js` | Self characters; sound catalogue (files with synth fallback) |
 | `js/assets.js` | Sprite loading with emoji fallback |
-| `js/perks.js` | Between-wave upgrades and the per-run modifiers they change |
+| `js/perks.js` | Per-run modifiers (`BASE_MODS`) |
 | `js/game.js` | Game engine: waves, spawning, movement, input, scoring, rendering |
 | `js/audio.js` | Synthesized sound effects (WebAudio, no files) |
 | `js/i18n.js` | English and Bangla text (language toggle on the menu; Bangla is picked automatically on Bangla devices) |
@@ -61,8 +61,10 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
    intruders run back towards India and fade away. Tough ones take several kicks, and each kick knocks them back a little.
 4. What happens when someone gets in depends on their **tier** (below). Only Hasina ends the game.
 5. When a wave is cleared there's a bonus and a short break, then the next, harder wave starts.
-   After every 2nd wave the player first **picks one of three upgrades** (see below).
-6. While Hasina is on the map, a gold HP bar under the HUD shows how much she has left.
+   There are no upgrade screens or extra buttons: just tap and catch (kept simple for all ages).
+6. Caught crooks sometimes say a funny line in a speech bubble ("Ouch!", "It wasn't me!"),
+   in English or Bangla (`quips` in `js/i18n.js`, chances in `CONFIG.fun`).
+7. While Hasina is on the map, a gold HP bar under the HUD shows how much she has left.
 
 ## Character tiers
 
@@ -110,7 +112,6 @@ gets art/sound slots (`assets/enemies/<id>/…`, `assets/sfx/enemies/<id>.mp3`).
 | Wave clear | **+50 × wave number** |
 | Sharpshooter | **+25 × wave number** if accuracy in that wave is ≥ 90% |
 | Sealed border | **+30 × wave number** if nobody got in during that wave |
-| Sweep catches | **50%** of base points, with no multiplier |
 | Senior leader gets in | **−200** (never more than your current score) |
 | Small leader gets in | **−50** |
 
@@ -152,8 +153,7 @@ A second mode, picked on the menu (code: `js/lasso.js`, numbers: `CONFIG.lasso`,
 | Win | **+500** per ❤️ left |
 | A crook gets in | −1 ❤️ (no points lost) |
 
-Power-ups: ❄️ Freeze (also stops sneakers), 🧱 Border Wall (slows everyone), 🛡️ Shield. This
-mode has no Charge, no Sweep and no upgrades.
+Power-ups: ❄️ Freeze (also stops sneakers) and 🛡️ Shield.
 
 ## Power-ups
 Any catch has a 7% chance to drop one, and Hasina always drops one. Tap a power-up to collect it.
@@ -162,36 +162,25 @@ It disappears after 6 s.
 | | Effect |
 |---|---|
 | ❄️ Freeze | All intruders stop for 4 s |
-| 🧱 Border Wall | Intruders move at 40% speed for 7 s |
 | 🛡️ Shield | Throws Hasina back once (stack up to 3) |
-| ⚡ Charge | +40 to the Sweep meter |
 
-## Upgrades (between waves)
-After clearing every 2nd wave the game pauses and offers **3 random upgrades**; pick one and it
-lasts for the rest of the run. Defined in `js/perks.js`.
-
-| | Upgrade | Effect | Max |
-|---|---|---|---|
-| 🎯 | Long Arms | Tap radius +25% | 2 |
-| 💪 | Strong Push | Tough intruders pushed back twice as far per hit | 2 |
-| 🔋 | Quick Charge | Sweep meter fills 30% faster | 3 |
-| 🍀 | Lucky Finds | Power-up drop chance +4% | 3 |
-| ⏱️ | Rhythm | Combo window +0.5 s | 2 |
-| 🧊 | Cold Storage | Freeze +2 s, Border Wall +3 s | 2 |
-| 🛡️ | Spare Shield | +1 shield now (only offered below 3 shields) | — |
+That's all: Border Wall, Charge, the Sweep button and the between-wave upgrades were removed on
+2026-11-12 to keep the game easy to pick up.
 
 The HUD shows a small yellow bar under the combo counter: the time left to keep the combo going.
 
-**⚡ Sweep** (button, or <kbd>Space</kbd>): fills as you catch intruders. When it's full, it catches
-everyone on screen at once. Hasina only takes 4 damage.
-
 ## Controls
 - Mobile: tap
-- Desktop: click. <kbd>Space</kbd> sweeps, <kbd>P</kbd>/<kbd>Esc</kbd> pauses, <kbd>Enter</kbd> starts.
+- Desktop: click. <kbd>R</kbd> turns the hero (Rope 'Em!), <kbd>P</kbd>/<kbd>Esc</kbd> pauses, <kbd>Enter</kbd> starts.
 - The game pauses automatically when the app goes to the background.
 
 ## Swapping in real characters
-Art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using exactly
+**Automatic (no drawing needed):** `node tools/gen-art.mjs` generates every character with agy's
+image generator (3D toy style), `node tools/chroma-key.mjs` removes the green background, then
+`node tools/build-assets.mjs`. One image per character is enough; other poses are animated by
+the game. Details: `tools/art/README.md`.
+
+**By hand:** art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using exactly
 the names listed there (see `assets/README.md`), then run:
 
 ```bash
@@ -212,6 +201,5 @@ assets automatically after first load.
 - [ ] Online leaderboard (e.g. Supabase or Firebase) and a daily challenge seed
 - [x] Splitter intruder (`small5`)
 - [ ] More intruder types: a decoy that costs points if you tap it, one that tunnels underground
-- [x] Upgrades between waves (pick 1 of 3 every 2 waves)
-- [ ] More upgrade types (auto-turret checkpoints, slower Hasina summons, …)
+- [x] Upgrades between waves (added, then removed 2026-11-12 for simplicity)
 - [ ] Endless mode vs. campaign with set levels per border district

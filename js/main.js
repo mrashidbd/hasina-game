@@ -2,7 +2,6 @@ import { Game } from './game.js';
 import { LassoGame } from './lasso.js';
 import { CHARACTERS, POWERUPS, TIERS } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
-import { PERKS } from './perks.js';
 import { unlockAudio, isMuted, setMuted, play as playSound, playMusic, stopMusic } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
 import { preloadImages, getSprite } from './assets.js';
@@ -13,12 +12,11 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
 
-const screens = ['menu', 'heroSelect', 'howto', 'pause', 'perk', 'over'];
+const screens = ['menu', 'heroSelect', 'howto', 'pause', 'over'];
 function show(id) {
   for (const s of screens) $(s).classList.toggle('hidden', s !== id);
   const playing = id === null;
-  $('hud').classList.toggle('hidden', !playing && id !== 'pause' && id !== 'perk');
-  $('sweepBtn').classList.toggle('hidden', !playing);
+  $('hud').classList.toggle('hidden', !playing && id !== 'pause');
   if (id === 'over') stopMusic();
   else if (id === null) playMusic('game');
   else if (id === 'menu' || id === 'howto' || id === 'heroSelect') playMusic('menu');
@@ -30,7 +28,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ----- HUD
-const hud = { locked: $('locked'), lives: $('lives'), score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield'), sweepFill: $('sweepFill'), sweepBtn: $('sweepBtn') };
+const hud = { locked: $('locked'), lives: $('lives'), score: $('score'), wave: $('wave'), combo: $('combo'), comboBar: $('comboBar'), shield: $('shield') };
 const lastHud = {};
 function setText(el, key, v) { if (lastHud[key] !== v) { lastHud[key] = v; el.textContent = v; } }
 function onHud(g) {
@@ -45,9 +43,6 @@ function onHud(g) {
     setText(hud.locked, 'locked', fmt(g.locked));
     setText(hud.lives, 'lives', '❤️'.repeat(g.lives) + '🖤'.repeat(g.maxLives - g.lives));
   }
-  const pct = `${g.sweep}%`;
-  if (lastHud.sweep !== pct) { lastHud.sweep = pct; hud.sweepFill.style.width = pct; }
-  hud.sweepBtn.classList.toggle('ready', g.sweep >= 100);
   if (g.mode === 'playing') {
     playMusic(g.enemies.some((e) => e.def.tier === 1) ? 'boss' : 'game');
   }
@@ -86,32 +81,6 @@ function onGameOver(s) {
   updateBest();
 }
 
-// ----- upgrade choice between waves
-let perkChoices = [];
-function onPerks(options) {
-  perkChoices = options;
-  renderPerks();
-  show('perk');
-}
-function renderPerks() {
-  if (!perkChoices.length) return;
-  $('perkSub').textContent = t('perkSub', { n: game.wave });
-  $('perkList').innerHTML = perkChoices.map((id) => {
-    const lvl = game.perks[id] || 0;
-    const max = PERKS[id].max;
-    return `<button class="perkBtn" data-perk="${id}"><span class="face">${PERKS[id].emoji}</span>
-      <span class="nm">${t(`perkName.${id}`)}<small>${t(`perkDesc.${id}`)}</small></span>
-      ${max < 99 ? `<span class="lvl">${fmt(lvl)}/${fmt(max)}</span>` : ''}</button>`;
-  }).join('');
-}
-$('perkList').onclick = (e) => {
-  const b = e.target.closest('[data-perk]');
-  if (!b) return;
-  perkChoices = [];
-  show(null);
-  game.choosePerk(b.dataset.perk);
-};
-
 let lastBest = 0;
 function renderOver() {
   const s = lastResult;
@@ -135,14 +104,14 @@ function renderOver() {
   $('overReason').textContent = t('breachReason', { who, wave: s.wave });
   $('overStats').innerHTML = [
     ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
-    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)], ['sPerks', fmt(s.perks)],
+    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)],
     ['sLeaked', fmt(s.leaked)], ['sLost', fmt(s.lost)],
     ['sBest', fmt(lastBest)],
   ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
 }
 
 // One game per mode on the same canvas; only the active one draws and takes input.
-const hooks = { onHud, onBanner, onGameOver, onPerks };
+const hooks = { onHud, onBanner, onGameOver };
 const games = { classic: new Game($('game'), hooks), lasso: new LassoGame($('game'), hooks) };
 let mode = store.get('kto-mode', 'classic');
 if (!games[mode]) mode = 'classic';
@@ -227,14 +196,13 @@ $('howBtn').onclick = () => show('howto');
 $('howBack').onclick = () => show('menu');
 function toMenu() {
   // Quitting mid-run still counts towards the high score.
-  if (['playing', 'paused', 'perk'].includes(game.mode)) saveBest(game.score, game.wave);
+  if (['playing', 'paused'].includes(game.mode)) saveBest(game.score, game.wave);
   game.mode = 'menu'; game.reset(); show('menu'); updateBest();
 }
 $('menuBtn').onclick = toMenu;
 $('quitBtn').onclick = toMenu;
 $('pauseBtn').onclick = () => { game.pause(); show('pause'); };
 $('resumeBtn').onclick = () => { game.resume(); show(null); };
-$('sweepBtn').onclick = () => game.useSweep();
 
 const muteBtn = $('muteBtn');
 const syncMute = () => { muteBtn.textContent = isMuted() ? '🔇' : '🔊'; };
@@ -257,7 +225,6 @@ $('shareBtn').onclick = async () => {
 
 // keyboard (desktop)
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') { e.preventDefault(); game.useSweep(); }
   if (e.code === 'KeyR' && game.mode === 'playing') game.reverse?.();
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (game.mode === 'playing') { game.pause(); show('pause'); } else if (game.mode === 'paused') { game.resume(); show(null); }
@@ -300,7 +267,6 @@ function applyLang() {
   for (const k of Object.keys(lastHud)) delete lastHud[k];
   updateBest();
   renderOver();
-  renderPerks();
   renderHeroes();
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };

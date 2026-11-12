@@ -30,9 +30,9 @@ const ENEMY_POSES = ['walk', 'kicked', 'idle'];
 const HERO_POSES = ['ready', 'kick', 'cheer'];
 const HERO_OPTIONAL = ['run', 'throw', 'pull']; // Rope 'Em! mode; fall back to ready/kick
 const GAME_SFX = [
-  'hit', 'miss', 'catch', 'combo', 'close', 'power', 'freeze', 'wall',
-  'shield', 'sweep', 'wave', 'cleared', 'warn', 'boss', 'leak',
-  'perk', 'over', 'record', 'tap',
+  'hit', 'miss', 'catch', 'combo', 'close', 'power', 'freeze',
+  'shield', 'wave', 'cleared', 'warn', 'boss', 'leak',
+  'over', 'record', 'tap',
 ];
 const MUSIC = ['menu', 'game', 'boss'];
 

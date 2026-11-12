@@ -61,15 +61,12 @@ with a short hero shout. Must feel satisfying when repeated fast (combos), so ke
 | `close` | 0.6 s | Tense "phew" swoosh with a bright ding, for a last-second save |
 | `power` | 0.6 s | Magical power-up pickup sparkle with a rising synth arpeggio |
 | `freeze` | 0.8 s | Icy crystal freezing crackle with a shimmering chime |
-| `wall` | 0.8 s | Heavy bricks stacking quickly into a wall, cartoon thud |
 | `shield` | 0.7 s | Energy shield deflecting with a metallic bwong and a short electric hum |
-| `sweep` | 1.2 s | Big whoosh of a crowd charging forward with a rising roar and a final burst |
 | `wave` | 1.0 s | Short heroic brass fanfare, three notes, for "next wave starts" |
 | `cleared` | 1.2 s | Triumphant short victory jingle with a drum roll hit, cartoon |
 | `warn` | 0.4 s | Short alert ping, two quick high beeps, not annoying |
 | `boss` | 1.5 s | Ominous low cartoon villain-arrival drum hit with a dramatic brass "dun dun", the main target is coming |
 | `leak` | 0.7 s | Descending sad trombone "wah-wah", short |
-| `perk` | 0.8 s | Bright magical upgrade sound with a choir "ahh" swell, non-verbal |
 | `over` | 2.0 s | Dramatic game-over sting: low brass fall and a gong, cartoon tragedy |
 | `record` | 1.5 s | Celebration with confetti pop, crowd cheer and a bright fanfare |
 | `tap` | 0.1 s | Tiny soft UI click for menu buttons |

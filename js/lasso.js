@@ -10,7 +10,7 @@ import { HEROES } from './data/heroes.js';
 import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
-import { getSprite, hasAsset } from './assets.js';
+import { getSprite, hasAsset, hasPose } from './assets.js';
 
 const L = CONFIG.lasso;
 
@@ -72,7 +72,6 @@ export class LassoGame extends Game {
   }
 
   powerupKinds() { return L.powerups; }
-  useSweep() {} // no sweep in this mode
 
   /** Called once by Game.start(); "waves" are levels here and advance on lockups. */
   nextWave() {
@@ -371,6 +370,7 @@ export class LassoGame extends Game {
     Object.assign(r, { phase: 'reel', target: best, cx: best.x, cy: best.y, auto: best.hp <= 1, tug: L.reelStart, autoT: 0 });
     sfx.hit();
     this.burst(best.x, best.y, '#c9a26b', 10);
+    this.quip(best); // "Not again!" as the loop lands (CONFIG.fun)
   }
 
   updateRope(dt) {
@@ -483,14 +483,16 @@ export class LassoGame extends Game {
         this.hooks.onBanner?.(tr('lLevelUp', { n: this.level }));
         sfx.wave();
       }
-      if (y.def.tier === 1) this.win();
+      if (y.def.tier === 1) this.win(y);
     }
   }
 
-  win() {
+  win(yank = null) {
     this.won = true;
     this.score += L.winBonusPerLife * this.lives;
     this.stats.mains++;
+    // Hasina always gets the last word, from inside the jail.
+    if (yank?.def) this.quip({ def: yank.def, x: DHAKA[0], y: DHAKA[1] }, true);
     // gold confetti: a big many-coloured burst around the jail
     const confetti = ['#ffe15a', '#ffd700', '#fff6c9', '#ffb4b4', '#7cffb2', '#6fd3ff'];
     for (let i = 0; i < confetti.length; i++) {
@@ -566,7 +568,6 @@ export class LassoGame extends Game {
   updatePlay(dt) {
     this.time += dt;
     this.freezeT = Math.max(0, this.freezeT - dt);
-    this.wallT = Math.max(0, this.wallT - dt);
     if (this.time - this.lastCatch > this.mods.comboWindow) this.combo = 0;
 
     // population: keep the map filled up to the level cap
@@ -611,7 +612,6 @@ export class LassoGame extends Game {
     this.updateYanks(dt);
 
     const frozen = this.freezeT > 0;
-    const slow = this.wallT > 0 ? CONFIG.powerups.wallSlow : 1;
     for (const e of [...this.enemies]) {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
@@ -619,7 +619,7 @@ export class LassoGame extends Game {
       if (e.state === 'roped' || frozen) continue;
 
       if (e.state === 'sneak') { // straight to Dhaka, no detours
-        const spd = (L.sneakSpeed + this.level * L.sneakSpeedPerLevel) * slow;
+        const spd = L.sneakSpeed + this.level * L.sneakSpeedPerLevel;
         const dx = DHAKA[0] - e.x, dy = DHAKA[1] - e.y;
         const d = Math.hypot(dx, dy) || 1;
         e.x += (dx / d) * spd * dt;
@@ -632,7 +632,7 @@ export class LassoGame extends Game {
         continue;
       }
 
-      let spd = e.speed * slow;
+      let spd = e.speed;
       if (e.state === 'dash') { // broken free: dash out, then lurk again
         spd *= L.breakDashMul;
         e.dashT -= dt;
@@ -790,8 +790,14 @@ export class LassoGame extends Game {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const spr = getSprite(y.def, 'kicked');
-      if (spr) ctx.drawImage(spr, -r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
-      else {
+      if (spr) {
+        if (!hasPose(y.def, 'kicked')) {
+          // One image per character: fake the kicked pose with a backward lean + squash.
+          ctx.rotate(-18 * Math.PI / 180);
+          ctx.scale(1.06, 0.92);
+        }
+        ctx.drawImage(spr, -r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
+      } else {
         ctx.fillStyle = y.def.color;
         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
         ctx.lineWidth = 2;
@@ -904,6 +910,9 @@ export class LassoGame extends Game {
     ctx.translate(hx, hy - bob);
     if (sprite) {
       if (this.heroFacing < 0) ctx.scale(-1, 1); // sprites face right
+      // One image per hero: fake the rope poses by leaning the ready pose.
+      if (r?.phase === 'reel' && !hasPose(def, 'pull')) ctx.rotate(-12 * Math.PI / 180); // leaning back
+      else if (r && r.phase !== 'reel' && !hasPose(def, 'throw')) ctx.rotate(10 * Math.PI / 180); // lean into the throw
       ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     } else {
       const rr = size * 0.4;
