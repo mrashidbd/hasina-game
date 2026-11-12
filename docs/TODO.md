@@ -42,10 +42,9 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [ ] Ideas: perks for this mode, an endless variant, letting the player drag the hero.
 
 ## Art (2026-11-12)
-- [ ] 10 characters still to generate after the agy image quota reset (see CHANGELOG); then
-      look at `art-src/sheet.png` and regenerate any odd ones with
-      `node tools/gen-art.mjs --only <id> --force`.
-- [ ] Some generated figures face the viewer or left instead of right; mirroring assumes
-      right. Regenerate those if it looks wrong in play.
+- [x] All 21 characters generated (user, Google Flow) and keyed.
+- [ ] The sprites total ~2.5 MB of PNG (384 px). If load time on mobile data matters, try
+      256 px (`node tools/chroma-key.mjs --size 256`) or add WebP support to the manifest.
+- [ ] Hero cards and the how-to roster show the whole tiny body in a small circle; a
+      head-and-shoulders crop would read better there.
 - [ ] Optional extra poses (`kicked`, hero `kick`) could be generated later for even more life.
-

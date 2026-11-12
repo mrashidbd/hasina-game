@@ -180,6 +180,9 @@ image generator (3D toy style), `node tools/chroma-key.mjs` removes the green ba
 `node tools/build-assets.mjs`. One image per character is enough; other poses are animated by
 the game. Details: `tools/art/README.md`.
 
+**With Google Flow / Gemini web:** paste the batches from `docs/prompts/flow-batches.md`, save
+each image as `art-src/<kind>/<id>.png` (or .jpg), then run the last two commands above.
+
 **By hand:** art and sound prompts are in `docs/prompts/`. Put the generated files in `assets/` using exactly
 the names listed there (see `assets/README.md`), then run:
 

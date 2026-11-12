@@ -26,9 +26,10 @@ const ENEMIES = [
   'murad', 'ferdous', 'mahi', 'somrat', 'riyaz',
 ];
 const HEROES = ['farmer', 'studentM', 'studentF', 'common'];
-const ENEMY_POSES = ['walk', 'kicked', 'idle'];
-const HERO_POSES = ['ready', 'kick', 'cheer'];
-const HERO_OPTIONAL = ['run', 'throw', 'pull']; // Rope 'Em! mode; fall back to ready/kick
+const ENEMY_POSES = ['walk']; // required; the game fakes the others from it
+const ENEMY_OPTIONAL = ['kicked', 'idle'];
+const HERO_POSES = ['ready']; // required; the game fakes the others from it
+const HERO_OPTIONAL = ['kick', 'cheer', 'run', 'throw', 'pull']; // Rope 'Em! mode; fall back to ready/kick
 const GAME_SFX = [
   'hit', 'miss', 'catch', 'combo', 'close', 'power', 'freeze',
   'shield', 'wave', 'cleared', 'warn', 'boss', 'leak',
@@ -90,7 +91,9 @@ console.log(`wrote ${path.relative(root, outPath)} (${files.length} file${files.
 for (const id of ENEMIES) {
   const missing = ENEMY_POSES.filter((p) => !known.has(`assets/enemies/${id}/${p}.png`));
   if (!soundPresent(`assets/sfx/enemies/${id}`)) missing.push('sfx');
-  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}`);
+  const opt = ENEMY_OPTIONAL.filter((p) => !known.has(`assets/enemies/${id}/${p}.png`));
+  const optNote = opt.length ? ` (optional, not yet: ${opt.join(', ')})` : '';
+  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}${optNote}`);
 }
 for (const id of HEROES) {
   const missing = HERO_POSES.filter((p) => !known.has(`assets/heroes/${id}/${p}.png`));

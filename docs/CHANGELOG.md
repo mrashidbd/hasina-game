@@ -3,6 +3,21 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-12 — all 21 characters (made by the user in Google Flow)
+- The user generated all 21 characters by hand in Google Flow with the prompts in
+  `docs/prompts/flow-batches.md` (the queued agy job was cancelled), replacing the 11
+  agy-made ones so the set matches. The old ones are in `art-src/*/old.generated/` (not
+  committed).
+- Claude:
+  - renamed `studenF.jpg` → `studentF.jpg`;
+  - removed the Windows `*:Zone.Identifier` files;
+  - keyed all 21 (`tools/chroma-key.mjs`; the green flag headbands survived) and rebuilt
+    the manifest (21 files, ~2.5 MB).
+  - The asset report now treats `kicked`/`idle`/`kick`/`cheer` as optional (the game fakes
+    them).
+- Tested headless (desktop + phone): all 21 images load, no page errors; hero select,
+  classic, lasso jail and the how-to roster show the art.
+
 ## 2026-11-12 — simpler game, reaction bubbles, automated 3D art (branch `lasso`)
 - **The user's goal:** fun for all ages, not complex. Decisions: keep only ❄️ Freeze + 🛡️ Shield;
   remove the classic upgrade (perk) screen and the Sweep button; add funny reaction bubbles;
