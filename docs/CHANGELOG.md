@@ -3,6 +3,10 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-17 — share loop live (`main`, SW `kto-v14`)
+- Deployed and smoke-tested on the live site. Reworded two English lines that read "1 times"
+  (headline and challenge text); Bangla unchanged.
+
 ## 2026-11-17 — PLAN-v3 phase 1: the share loop
 - **Why:** the game exists to be shared as a troll of the "we're coming back" hype; before this,
   sharing was one line of text and classic runs were shared as a defeat.

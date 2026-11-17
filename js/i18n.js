@@ -38,7 +38,7 @@ const STRINGS = {
     record: '🏆 NEW RECORD!',
     again: '↻ Play again', menu: 'Menu',
     // Share loop (js/share.js): headline, rank, share buttons, challenge links.
-    hlClassic: 'Hasina tried to come back {tries} times. Kicked out {n} times! 🦶',
+    hlClassic: 'Hasina\'s comeback attempts: {tries}. Kicked out: {n}! 🦶',
     hlClassic0: 'Hasina slipped in this time… the kick is coming next round! 🦶',
     hlLassoWin: 'Hasina is behind bars! Case closed. 🔒',
     hlLasso: 'I put {n} crooks behind bars! 🔒',
@@ -55,7 +55,7 @@ const STRINGS = {
     shareStory: 'Story image',
     savedImg: 'Image saved!',
     changeHero: 'Change hero',
-    challenge: 'Your friend scored <b>{score}</b> in {mode} and kicked Hasina out <b>{k}</b> times. Can you beat that?',
+    challenge: 'Your friend scored <b>{score}</b> in {mode}. Hasina kicked out: <b>{k}</b>. Can you beat that?',
     quickPlay: '▶ PLAY NOW',
     modeClassic: 'Keep Them Out',
     modeLasso: "Rope 'Em!",

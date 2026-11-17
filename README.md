@@ -170,8 +170,8 @@ That's all: Border Wall, Charge, the Sweep button and the between-wave upgrades 
 The HUD shows a small yellow bar under the combo counter: the time left to keep the combo going.
 
 ## Sharing and challenge links
-- The game-over screen shows a funny headline ("Hasina tried to come back 3 times. Kicked out
-  2 times!"), a rank (Sleepy guard → Border legend) and a **share card** image. Share it through
+- The game-over screen shows a funny headline ("Hasina's comeback attempts: 3. Kicked out:
+  2!"), a rank (Sleepy guard → Border legend) and a **share card** image. Share it through
   the phone's share sheet, WhatsApp, Facebook, or save a story-size image.
 - Shared links carry the score: `?c=<score>&k=<times Hasina was kicked back>&m=classic|lasso`.
   A friend who opens one sees "Your friend scored … Can you beat that?" and one PLAY button.
