@@ -474,6 +474,7 @@ export class Game {
   summary() {
     return {
       score: this.score, wave: this.wave, bestCombo: this.bestCombo, ...this.stats,
+      mode: 'classic', hero: this.hero, mainTries: this.mainCount,
       accuracy: this.stats.taps ? Math.round((this.stats.hits / this.stats.taps) * 100) : 0,
       intruderType: this.breachAt?.type ?? '',
     };

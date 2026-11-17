@@ -5,6 +5,11 @@ import { HEROES } from './data/heroes.js';
 import { unlockAudio, isMuted, setMuted, play as playSound, playMusic, stopMusic } from './audio.js';
 import { t, fmt, getLang, setLang } from './i18n.js';
 import { preloadImages, getSprite } from './assets.js';
+import { CONFIG } from './config.js';
+import {
+  rankOf, headline, makeCardBlob, shareResult,
+  whatsappUrl, facebookUrl, downloadCard,
+} from './share.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -12,15 +17,19 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
 
-const screens = ['menu', 'heroSelect', 'howto', 'pause', 'over'];
+const screens = ['menu', 'heroSelect', 'quick', 'howto', 'pause', 'over'];
 function show(id) {
   for (const s of screens) $(s).classList.toggle('hidden', s !== id);
   const playing = id === null;
   $('hud').classList.toggle('hidden', !playing && id !== 'pause');
   if (id === 'over') stopMusic();
   else if (id === null) playMusic('game');
-  else if (id === 'menu' || id === 'howto' || id === 'heroSelect') playMusic('menu');
+  else if (id === 'menu' || id === 'howto' || id === 'heroSelect' || id === 'quick') playMusic('menu');
 }
+
+// Set when the page was opened from a shared link (see readLink).
+let challenge = null; // { score, k, mode } from ?c=&k=&m=
+let quickMode = null; // mode the #quick screen's PLAY button starts
 
 // One delegated listener for menu button clicks (tap sound).
 document.addEventListener('click', (e) => {
@@ -82,32 +91,66 @@ function onGameOver(s) {
 }
 
 let lastBest = 0;
+
+/** Regenerate the card preview, debounced (language / art changes batch up). */
+let cardTimer = 0;
+let cardGen = 0;
+let cardUrl = '';
+let cardBlob = null; // the preview PNG, reused by the share button
+function scheduleCardPreview() {
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(renderCardPreview, 120);
+}
+async function renderCardPreview() {
+  const img = $('cardPreview');
+  cardBlob = null;
+  if (!lastResult) { img.classList.add('hidden'); return; }
+  const gen = ++cardGen;
+  try {
+    const blob = await makeCardBlob(lastResult, 'post');
+    if (gen !== cardGen) return; // superseded by a newer render
+    if (cardUrl) URL.revokeObjectURL(cardUrl);
+    cardBlob = blob;
+    cardUrl = URL.createObjectURL(blob);
+    img.src = cardUrl;
+    img.classList.remove('hidden');
+  } catch { img.classList.add('hidden'); }
+}
+
 function renderOver() {
   const s = lastResult;
   if (!s) return;
   const title = $('overTitle');
   title.classList.remove('good', 'bad');
   const who = s.intruderType ? t(`char.${s.intruderType}`) : '';
+  $('overHeadline').textContent = headline(s);
+  $('overRank').textContent = t('rank')[rankOf(s)];
+  const vs = $('overVs');
+  if (challenge && challenge.mode === s.mode) {
+    const beaten = s.score > challenge.score;
+    vs.textContent = beaten ? t('vsWin', { score: challenge.score }) : t('vsLose', { score: challenge.score });
+    vs.className = beaten ? 'vs win' : 'vs lose';
+  } else {
+    vs.className = 'vs hidden';
+  }
   if (s.mode === 'lasso') {
     title.textContent = s.won ? t('lWinTitle') : t('lLostTitle');
     title.classList.add(s.won ? 'good' : 'bad');
     $('overReason').textContent = s.won ? t('lWinReason', { time: s.time }) : t('lOverSneak');
     $('overStats').innerHTML = [
-      ['sLevel', fmt(s.level)], ['sLocked', fmt(s.locked)],
-      ['sLives', '❤️'.repeat(s.lives) || fmt(0)], ['sCombo', fmt(s.bestCombo)],
-      ['sAcc', `${fmt(s.accuracy)}%`], ['sBest', fmt(lastBest)],
+      ['sLocked', fmt(s.locked)], ['sLevel', fmt(s.level)],
+      ['sLives', '❤️'.repeat(s.lives) || fmt(0)], ['sBest', fmt(lastBest)],
     ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
-    return;
+  } else {
+    title.textContent = t('overClassic');
+    title.classList.add('bad');
+    $('overReason').textContent = t('breachReason', { who, wave: s.wave });
+    $('overStats').innerHTML = [
+      ['sCaught', fmt(s.caught)], ['sMain', fmt(s.mains)],
+      ['sCombo', fmt(s.bestCombo)], ['sBest', fmt(lastBest)],
+    ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
   }
-  title.textContent = t('breached');
-  title.classList.add('bad');
-  $('overReason').textContent = t('breachReason', { who, wave: s.wave });
-  $('overStats').innerHTML = [
-    ['sWave', fmt(s.wave)], ['sCaught', fmt(s.caught)], ['sCombo', fmt(s.bestCombo)],
-    ['sAcc', `${fmt(s.accuracy)}%`], ['sClose', fmt(s.closeCalls)], ['sMain', fmt(s.mains)],
-    ['sLeaked', fmt(s.leaked)], ['sLost', fmt(s.lost)],
-    ['sBest', fmt(lastBest)],
-  ].map(([k, v]) => `<div><span>${t(k)}</span><b>${v}</b></div>`).join('');
+  scheduleCardPreview();
 }
 
 // One game per mode on the same canvas; only the active one draws and takes input.
@@ -209,19 +252,54 @@ const syncMute = () => { muteBtn.textContent = isMuted() ? '🔇' : '🔊'; };
 muteBtn.onclick = () => { setMuted(!isMuted()); unlockAudio(); syncMute(); };
 syncMute();
 
-$('shareBtn').onclick = async () => {
-  const s = lastResult;
-  const text = s?.mode === 'lasso'
-    ? (s.won
-      ? t('lShareWin', { score: s.score, time: s.time })
-      : t('lShareText', { level: s.level, score: s.score }))
-    : t('shareText', { wave: s?.wave ?? 1, score: s?.score ?? 0 });
-  const url = location.href.split('#')[0];
-  try {
-    if (navigator.share) await navigator.share({ title: t('title'), text, url });
-    else { await navigator.clipboard.writeText(`${text} ${url}`); onBanner(t('copied'), t('copiedSub')); }
-  } catch { /* user cancelled */ }
+// ----- share buttons (system sheet / WhatsApp / Facebook / story download)
+async function shareFromOver() {
+  if (!lastResult) return;
+  const result = await shareResult(lastResult, cardBlob);
+  if (result === 'downloaded') onBanner(t('savedImg'), t('copiedSub'));
+}
+$('shareBtn').onclick = shareFromOver;
+$('cardPreview').onclick = shareFromOver; // tapping the card shares it too
+$('waBtn').onclick = () => lastResult && window.open(whatsappUrl(lastResult), '_blank', 'noopener');
+$('fbBtn').onclick = () => lastResult && window.open(facebookUrl(lastResult), '_blank', 'noopener');
+$('storyBtn').onclick = async () => {
+  if (!lastResult) return;
+  try { await downloadCard(lastResult, 'story'); onBanner(t('savedImg'), ''); } catch { /* ignore */ }
 };
+$('heroChangeBtn').onclick = () => { setMode(mode); renderHeroes(); show('heroSelect'); };
+
+// ----- challenge / instant-play links (?c=&k=&m= or ?play=)
+function readLink() {
+  const q = new URLSearchParams(location.search);
+  const c = parseInt(q.get('c'), 10);
+  if (Number.isFinite(c)) {
+    const k = parseInt(q.get('k'), 10);
+    challenge = {
+      score: Math.min(CONFIG.share.maxChallengeScore, Math.max(0, c)),
+      k: Number.isFinite(k) ? Math.min(999, Math.max(0, k)) : 0,
+      mode: q.get('m') === 'lasso' ? 'lasso' : 'classic',
+    };
+    quickMode = challenge.mode;
+  } else if (q.get('play') === 'classic' || q.get('play') === 'lasso') {
+    quickMode = q.get('play');
+  }
+  // A reload shows the normal menu instead of replaying the link.
+  if (challenge || quickMode) history.replaceState(null, '', location.pathname);
+  return !!(challenge || quickMode);
+}
+
+function renderQuick() {
+  $('quickText').innerHTML = challenge
+    ? t('challenge', { score: challenge.score, k: challenge.k, mode: t(challenge.mode === 'lasso' ? 'modeLasso' : 'modeClassic') })
+    : t('tagline');
+}
+function startQuickPlay() {
+  unlockAudio();
+  setMode(quickMode || 'classic');
+  play(selectedHero);
+}
+$('quickPlay').onclick = startQuickPlay;
+$('quickMenu').onclick = () => show('menu');
 
 // keyboard (desktop)
 window.addEventListener('keydown', (e) => {
@@ -232,6 +310,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Enter') {
     if (!$('heroSelect').classList.contains('hidden')) play(selectedHero);
     else if (!$('menu').classList.contains('hidden')) { renderHeroes(); show('heroSelect'); }
+    else if (!$('quick').classList.contains('hidden')) startQuickPlay();
     else if (!$('over').classList.contains('hidden')) play(selectedHero);
   }
 });
@@ -267,6 +346,7 @@ function applyLang() {
   for (const k of Object.keys(lastHud)) delete lastHud[k];
   updateBest();
   renderOver();
+  renderQuick();
   renderHeroes();
 }
 $('langBtn').onclick = () => { setLang(getLang() === 'bn' ? 'en' : 'bn'); applyLang(); };
@@ -277,9 +357,10 @@ preloadImages(() => {
   cancelAnimationFrame(artRefresh);
   artRefresh = requestAnimationFrame(() => applyLang());
 });
+const fromLink = readLink(); // parses ?c/?play first so applyLang can use it
 setMode(mode);
 applyLang();
-show('menu');
+show(fromLink ? 'quick' : 'menu');
 
 // ----- PWA: install prompt + service worker
 let deferredPrompt = null;

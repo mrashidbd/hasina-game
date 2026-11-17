@@ -50,6 +50,7 @@ an extension point).
 ```
 index.html ──loads──> js/main.js (UI glue)
                          ├── js/lasso.js (LassoGame extends Game: Rope 'Em! mode)
+                         ├── js/share.js (share cards, ranks, headlines, challenge links)
                          ├── js/game.js (engine: Game class)
                          │      ├── js/map.js        (geometry + map data)
                          │      ├── js/config.js     (CONFIG: all tunables)
@@ -271,6 +272,30 @@ when tier 1 is near the border). Hero kicks (`drawKick`) are drawn right after t
 whole frame. DPR is capped at 2.
 
 Map labels come from `LABELS[].key` → `t('map.<key>')`, so they follow the language.
+
+## Share loop (`js/share.js`, PLAN-v3 phase 1)
+- The game-over screen leads with a funny **headline** (`headline(s)`: classic uses
+  `mainTries` = Hasina appearances and `mains` = times she was kicked back), the score, a
+  **rank** (`rankOf(s)`, thresholds in `CONFIG.share`: classic counts `caught`, Rope 'Em!
+  counts `locked`, a win is at least rank 4) and a **share card** preview.
+- `drawCard(ctx, w, h, data)` draws the card on any canvas: portrait for the post
+  (1080×1350) and story (1080×1920) images, landscape for the 1200×630 link preview;
+  `data` is a run summary or `{ promo: true }`. The flag disc and characters are drawn
+  before the text. Bangla uses the bundled font "KTO Bangla"
+  (`assets/fonts/noto-sans-bengali-800.woff2`, `@font-face` in `css/style.css`, Bengali
+  range only); `ensureCardFont()` loads it first because canvas doesn't wait for fonts.
+- Sharing: `shareResult(s, blob)` → Web Share with the PNG file → text-only share → download
+  + clipboard. main.js passes the already-rendered preview blob so the share call stays
+  inside the tap's user activation (Safari refuses otherwise). WhatsApp / Facebook buttons
+  open `wa.me` / `facebook.com/sharer` with `challengeUrl(s)`.
+- **Links:** `?c=<score>&k=<kicks>&m=classic|lasso` (challenge) and `?play=classic|lasso`
+  (instant play) show the `#quick` screen (one PLAY button, skips hero select, uses the
+  remembered hero). Values are clamped; the query is removed with `history.replaceState`.
+  With a challenge, the game-over screen of that mode shows "you beat / try again".
+- **Link preview:** `og:*` / `twitter:*` tags in `index.html` point to the absolute
+  `icons/og-image.jpg`, rendered by `drawCard` via `node tools/cdp.mjs tools/og-image.mjs`
+  (static server on 8765 needed). Re-run it when the art or `cardPromo` text changes, and
+  update the absolute URLs (`CONFIG.share.url`, og tags) if the domain changes.
 
 ## Persistence (`localStorage` keys)
 | Key | Value |

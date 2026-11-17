@@ -13,9 +13,22 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Keep Them Out">
-  <meta property="og:title" content="Keep Them Out!">
-  <meta property="og:description" content="Defend Bangladesh's border — how many waves can you hold?">
-  <meta property="og:image" content="icons/icon-512.png">
+  <!-- Link previews (Facebook / WhatsApp / X). og:image must be an absolute URL.
+       Rebuild the image with: node tools/cdp.mjs tools/og-image.mjs -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mrashidbd.github.io/hasina-game/">
+  <meta property="og:site_name" content="ঢুকতে দেবো না! · Keep Them Out!">
+  <meta property="og:title" content="ঢুকতে দেবো না! · Keep Them Out!">
+  <meta property="og:description" content="ওরা বারবার বলে ফিরে আসবে। আমরা বারবার লাথি মেরে ফেরত পাঠাই! ফ্রি খেলো, স্কোর শেয়ার করো। · They keep saying they're coming back. We keep kicking them out!">
+  <meta property="og:image" content="https://mrashidbd.github.io/hasina-game/icons/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A farmer kicks Hasina back out of Bangladesh">
+  <meta property="og:locale" content="bn_BD">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://mrashidbd.github.io/hasina-game/icons/og-image.jpg">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -61,6 +74,17 @@
     </div>
   </section>
 
+  <!-- Instant play / challenge link (?play= / ?c=&k=&m=) -->
+  <section id="quick" class="screen hidden">
+    <div class="panel">
+      <div class="logo">🛡️🇧🇩</div>
+      <h1 data-i18n="title"></h1>
+      <p id="quickText" class="tag"></p>
+      <button id="quickPlay" class="primary" data-i18n="quickPlay">▶ PLAY NOW</button>
+      <button id="quickMenu" data-i18n="menu">Menu</button>
+    </div>
+  </section>
+
   <!-- How to play -->
   <section id="howto" class="screen hidden">
     <div class="panel scroll">
@@ -89,14 +113,29 @@
   <!-- Game over -->
   <section id="over" class="screen hidden">
     <div class="panel">
-      <h2 id="overTitle" class="bad" data-i18n="breached">BORDER BREACHED!</h2>
+      <h2 id="overTitle" class="bad">BORDER BREACHED!</h2>
+      <p id="overHeadline" class="headline"></p>
       <p id="overReason" class="tag"></p>
       <div class="bigscore" id="overScore">0</div>
-      <div id="overRecord" class="record hidden" data-i18n="record">🏆 NEW RECORD!</div>
-      <div id="overStats" class="stats"></div>
+      <p id="overVs" class="vs hidden"></p>
+      <div class="scoreMeta">
+        <span id="overRank" class="rankPill"></span>
+        <span id="overRecord" class="record hidden" data-i18n="record">🏆 NEW RECORD!</span>
+      </div>
+      <img id="cardPreview" class="cardPreview hidden" alt="">
+      <!-- Share first (it's the point of the game), then replay; stats are secondary. -->
+      <button id="shareBtn" class="primary" data-i18n="shareImg">📤 Share my result</button>
+      <div class="shareRow">
+        <button id="waBtn" data-i18n="shareWa">WhatsApp</button>
+        <button id="fbBtn" data-i18n="shareFb">Facebook</button>
+        <button id="storyBtn" data-i18n="shareStory">Story image</button>
+      </div>
       <button id="againBtn" class="primary" data-i18n="again">↻ Play again</button>
-      <button id="shareBtn" data-i18n="share">Share score</button>
-      <button id="menuBtn" data-i18n="menu">Menu</button>
+      <div id="overStats" class="stats"></div>
+      <div class="shareRow">
+        <button id="heroChangeBtn" data-i18n="changeHero">Change hero</button>
+        <button id="menuBtn" data-i18n="menu">Menu</button>
+      </div>
     </div>
   </section>
 

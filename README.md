@@ -169,6 +169,24 @@ That's all: Border Wall, Charge, the Sweep button and the between-wave upgrades 
 
 The HUD shows a small yellow bar under the combo counter: the time left to keep the combo going.
 
+## Sharing and challenge links
+- The game-over screen shows a funny headline ("Hasina tried to come back 3 times. Kicked out
+  2 times!"), a rank (Sleepy guard → Border legend) and a **share card** image. Share it through
+  the phone's share sheet, WhatsApp, Facebook, or save a story-size image.
+- Shared links carry the score: `?c=<score>&k=<times Hasina was kicked back>&m=classic|lasso`.
+  A friend who opens one sees "Your friend scored … Can you beat that?" and one PLAY button.
+- `?play=classic` or `?play=lasso` skips the menu and hero select (handy for posts and ads).
+- Link previews use `icons/og-image.jpg` (rebuild: `node tools/cdp.mjs tools/og-image.mjs`).
+
+| Rank | Classic (crooks caught) | Rope 'Em! (lockups) |
+|---|---|---|
+| Sleepy guard | 0–9 | 0–4 |
+| Rookie guard | 10+ | 5+ |
+| Border watcher | 30+ | 12+ |
+| Kick master | 60+ | 20+ |
+| Comeback canceller | 100+ | 30+ (or a win) |
+| Border legend | 160+ | 45+ |
+
 ## Controls
 - Mobile: tap
 - Desktop: click. <kbd>R</kbd> turns the hero (Rope 'Em!), <kbd>P</kbd>/<kbd>Esc</kbd> pauses, <kbd>Enter</kbd> starts.

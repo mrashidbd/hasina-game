@@ -167,4 +167,13 @@ export const CONFIG = {
     winBonusPerLife: 500,
     powerups: ['freeze', 'shield'],
   },
+  // Share loop (js/share.js, PLAN-v3 phase 1).
+  share: {
+    // rank index = number of thresholds reached; classic counts crooks caught, lasso counts lockups
+    ranksClassic: [10, 30, 60, 100, 160],
+    ranksLasso: [5, 12, 20, 30, 45],
+    lassoWinMinRank: 4, // winning Rope 'Em! gives at least this rank
+    url: 'https://mrashidbd.github.io/hasina-game/', // canonical URL printed on cards / used in share links
+    maxChallengeScore: 10000000, // sanity cap for ?c= values from links
+  },
 };

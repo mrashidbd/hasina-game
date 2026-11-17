@@ -28,6 +28,15 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [ ] Map: tiny islands such as St Martin's are dropped by the area threshold in
       `tools/build-map.mjs`; add an explicit keep-list if wanted.
 
+## Share loop (PLAN-v3 phase 1)
+- [ ] Test sharing on real phones: Android Chrome, iOS Safari, Facebook/Messenger in-app browsers.
+- [ ] After deploy, run the Facebook Sharing Debugger on the live URL (and a `?c=` URL) to refresh
+      the cached preview.
+- [ ] User to review the Bangla headlines, ranks and challenge text in `js/i18n.js`.
+- [ ] Rank thresholds (`CONFIG.share`) are guesses; tune after play-testing.
+- [ ] The UI (not the cards) still relies on the device's Bangla font; old Windows/Android may
+      render it poorly. Consider using "KTO Bangla" for UI headings too.
+
 ## Content placeholders (user to decide)
 - [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).
 

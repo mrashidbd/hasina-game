@@ -3,6 +3,39 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-17 — PLAN-v3 phase 1: the share loop
+- **Why:** the game exists to be shared as a troll of the "we're coming back" hype; before this,
+  sharing was one line of text and classic runs were shared as a defeat.
+- Coded by opencode + GLM-5.3 from a brief, reviewed and fixed by Claude:
+  - new `js/share.js`: share card drawn on canvas (post 1080×1350, story 1080×1920, link
+    preview 1200×630), ranks, headlines, Web Share with the image, WhatsApp/Facebook links;
+  - game-over screen rebuilt: headline ("tried 3 times, kicked out 2 times"), rank pill, card
+    preview, share buttons above "Play again", 4 stats instead of 9;
+  - `?c=&k=&m=` challenge links and `?play=` instant play via a new one-button `#quick` screen;
+  - `CONFIG.share`, `summary()` gains `mode`, `hero`, `mainTries`; 24 new strings in en + bn
+    (Bangla drafted by Claude: the user should review the jokes and ranks).
+- Claude's fixes and additions:
+  - share uses the already-rendered preview blob (Safari drops the share sheet after an await);
+  - text-only share no longer repeats the URL;
+  - flag disc drawn before the title (it washed the title out); hero closer and leaning in;
+  - bundled Noto Sans Bengali ExtraBold (48 KB, OFL) as "KTO Bangla" for cards;
+  - link preview: `tools/og-image.mjs` → `icons/og-image.jpg` (64 KB) and absolute, Bangla-first
+    `og:*` / `twitter:*` tags;
+  - game-over order: share first, then replay, stats below; Bangla challenge phrasing.
+- Tested headless (390×844 and 360×640): challenge link → quick screen → play → game over with
+  "beat/try again" line, card preview, download fallback, Bangla cards, lasso win card,
+  `?play=lasso`, bad/negative params. No page errors. SW `kto-v13`.
+- Not done: real-phone test of the share sheet (Android Chrome, iOS Safari, FB/Messenger in-app
+  browsers) and the Facebook Sharing Debugger after deploy.
+
+## 2026-11-17 — review and Plan v3 (no code changes)
+- Fresh review of the whole game against its purpose (trolling the "we're coming back" hype on
+  social media). Played both modes headless at phone size.
+- Main findings: sharing is text only, classic runs always end in a shared *defeat*, the
+  `og:image` is relative (broken Facebook previews), the satire is generic, there is no daily
+  hook and no analytics. Full list and phased plan: `docs/PLAN-v3.md`. Waiting on the user's
+  decisions listed at the end of that file.
+
 ## 2026-11-12 — `lasso` goes live
 - `lasso` fast-forwarded into `main` and deployed: both modes (Keep Them Out + Rope 'Em!), the
   simplified rules, reaction bubbles and all 21 3D characters. SW `kto-v12`.

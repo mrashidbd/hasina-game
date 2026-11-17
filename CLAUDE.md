@@ -48,7 +48,7 @@ Application → "Update on reload", otherwise you may see the cached old version
 |---|---|
 | `index.html` | All screens (menu, how-to, pause, game over), HUD. Static text uses `data-i18n="key"` |
 | `css/style.css` | Styling, responsive, safe-area insets |
-| `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), share, keyboard, PWA install, SW registration, renders how-to tables from data |
+| `js/main.js` | UI glue: screen switching, HUD updates, high score (`localStorage`), game-over/share buttons, `?c=`/`?play=` links (`#quick` screen), keyboard, PWA install, SW registration, renders how-to tables from data |
 | `js/game.js` | `Game` class (classic mode): waves, spawning, movement, input, scoring, power-ups, rendering, main loop |
 | `js/lasso.js` | `LassoGame extends Game`: the "Rope 'Em!" mode (lurkers outside BD, hero orbit + chase, rope, jail, sneak-ins, Hasina = win). Tunables `CONFIG.lasso`; design `docs/PLAN-lasso.md` |
 | `js/config.js` | **`CONFIG`: every global tunable** (layout, spawn, waves, scoring, input, combat, power-ups, kick, sprites, audio, fun, lasso) with units |
@@ -61,6 +61,8 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `tools/build-assets.mjs` | Scans `assets/`, writes the manifest, reports missing files per character |
 | `tools/gen-art.mjs`, `tools/chroma-key.mjs`, `tools/art/` | **Automated art**: agy image-generator → `art-src/` (git-ignored) → green-screen removal in headless Chromium → `assets/`. See `tools/art/README.md` |
 | `tools/cdp.mjs` | Headless-Chromium driver for smoke tests/screenshots: `SHOTS=<dir> node tools/cdp.mjs <script.mjs>` |
+| `js/share.js` | Share loop: `drawCard` (share cards + link preview), `rankOf`, `headline`, `shareResult`, challenge / WhatsApp / Facebook URLs. Tunables `CONFIG.share` |
+| `tools/og-image.mjs` | Renders `icons/og-image.jpg` (link preview) with `drawCard`: `node tools/cdp.mjs tools/og-image.mjs` |
 | `js/perks.js` | `BASE_MODS`: per-run modifiers copied to `game.mods` (the upgrade screen was removed 2026-11-12) |
 | `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |
 | `js/data/map-bd.js` | **Generated** map data (Natural Earth 10m). Don't edit; run `tools/build-map.mjs` |
@@ -118,8 +120,9 @@ sends larger corrections back to the tools.
 - Two agents can run in parallel only on disjoint files (say so in each brief).
 - Briefs: precise file list, exact values, "don't" list (no docs edits, no commits, no
   deps), and "done when" checks. Keep briefs in the session scratchpad, not the repo.
-- Current roadmap: `docs/PLAN-v2.md` (done except phase F) and `docs/PLAN-lasso.md`
-  (Rope 'Em! mode, branch `lasso`). Art/sound prompts for the user: `docs/prompts/`.
+- Current roadmap: **`docs/PLAN-v3.md`** (share loop, topical satire, daily challenge, live
+  events; proposed 2026-11-17). Older: `docs/PLAN-v2.md` (done except phase F, folded into v3) and
+  `docs/PLAN-lasso.md` (Rope 'Em!, live). Art/sound prompts for the user: `docs/prompts/`.
 
 ## Documentation upkeep (mandatory)
 These docs exist so the next agent can pick up context fast. When you change the
