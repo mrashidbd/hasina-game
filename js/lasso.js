@@ -10,7 +10,7 @@ import { HEROES } from './data/heroes.js';
 import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
-import { getSprite, hasAsset, hasPose } from './assets.js';
+import { getSprite, getFrame, hasAsset, hasPose } from './assets.js';
 
 const L = CONFIG.lasso;
 
@@ -155,7 +155,7 @@ export class LassoGame extends Game {
     return p && { ...p, tx: p.x, ty: p.y };
   }
 
-  spawn(type, at = null, primary = !at) {
+  spawn(type, at = null, primary = !at, emerge = true) {
     const def = CHARACTERS[type];
     const p = at || this.spawnPoint();
     if (!def || !p) return;
@@ -168,6 +168,7 @@ export class LassoGame extends Game {
       home: { x: p.x, y: p.y }, facing: 1, near: Infinity, pose: null,
       state: 'lurk', turnT: 0, wx: p.x, wy: p.y, dashT: 0,
     };
+    if (emerge) this.emergeAt(e, p, def); // climb out of a hole (splitter children don't)
     if (main) {
       e.hp = e.maxHp = def.hp + this.mainCount * CONFIG.waves.mainHpPerAppearance; // tougher every appearance
       this.mainCount++;
@@ -212,9 +213,9 @@ export class LassoGame extends Game {
     return Math.max(L.sneakEveryMin, L.sneakEvery * Math.pow(L.sneakSpeedup, this.level - 1));
   }
 
-  /** One lurking tier 2/3 crook starts a run at Dhaka (never Hasina, never a roped one). */
+  /** One lurking tier 2/3 crook starts a run at Dhaka (never Hasina, never a roped one, never one still emerging). */
   startSneak() {
-    const cands = this.enemies.filter((e) => e.def.tier > 1 && e.state === 'lurk');
+    const cands = this.enemies.filter((e) => e.def.tier > 1 && e.state === 'lurk' && !this.isEmerging(e));
     if (!cands.length) return;
     const e = cands[Math.floor(Math.random() * cands.length)];
     e.state = 'sneak';
@@ -364,6 +365,7 @@ export class LassoGame extends Game {
     }
     this.stats.hits++; this.waveStats.hits++;
     best.state = 'roped';
+    if (this.isEmerging(best)) this.emergeOut(best); // the rope yanks it out of the hole
     best.pose = 'kicked';
     best.near = Infinity;
     best.hitFlash = CONFIG.combat.hitFlashTime;
@@ -458,7 +460,8 @@ export class LassoGame extends Game {
       const { into, n } = e.def.splits;
       for (let i = 0; i < n; i++) {
         const p = this.lurkPoint(e, L.waypointMaxDist);
-        if (p) this.spawn(into[Math.floor(Math.random() * into.length)], p);
+        // Splitter children come out of the roped character: no hole, no emerge.
+        if (p) this.spawn(into[Math.floor(Math.random() * into.length)], p, false, false);
       }
     }
     this.yanks.push({ def: e.def, type: e.type, x0: e.x, y0: e.y, t: 0 });
@@ -616,6 +619,13 @@ export class LassoGame extends Game {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
       if (e.hop > 0) e.hop = Math.max(0, e.hop - dt / FX.hopFade);
+      // Still climbing out of its hole: ropable, but no lurking, sneaking or
+      // summoning until it is fully out.
+      if (this.isEmerging(e)) {
+        e.emergeT -= dt;
+        if (e.emergeT <= 0) this.emergeOut(e);
+        continue;
+      }
       if (e.state === 'roped' || frozen) continue;
 
       if (e.state === 'sneak') { // straight to Dhaka, no detours
@@ -670,9 +680,10 @@ export class LassoGame extends Game {
       }
     }
 
-    // Hasina slips away after mainStay s on the map (her timer pauses while roped)
+    // Hasina slips away after mainStay s on the map (her timer pauses while roped
+    // and while she is still climbing out of her hole)
     const main = this.enemies.find((e) => e.def.tier === 1);
-    if (main && main.state !== 'roped') {
+    if (main && main.state !== 'roped' && !this.isEmerging(main)) {
       this.mainT += dt;
       if (this.mainT >= L.mainStay) this.mainSlip(main);
     }
@@ -742,6 +753,13 @@ export class LassoGame extends Game {
       const gx = -w / 2 + (i % cols) * cw + cw / 2;
       const gy = -h / 2 + Math.floor(i / cols) * ch + ch / 2;
       const r = Math.min(cw, ch) * 0.4;
+      // Jailed portraits fidget behind the bars (this.time is the game clock;
+      // the per-cell offset stops every face moving in lockstep).
+      const frame = getFrame(cdef, 'jailed', this.time + i * 0.37);
+      if (frame) {
+        ctx.drawImage(frame.img, frame.sx, 0, frame.side, frame.side, gx - r, gy - r, r * 2, r * 2);
+        return;
+      }
       const spr = getSprite(cdef, 'idle');
       if (spr) ctx.drawImage(spr, gx - r, gy - r, r * 2, r * 2);
       else {
@@ -789,22 +807,28 @@ export class LassoGame extends Game {
       ctx.rotate(y.t * FX.spinSpeed);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const spr = getSprite(y.def, 'kicked');
-      if (spr) {
-        if (!hasPose(y.def, 'kicked')) {
-          // One image per character: fake the kicked pose with a backward lean + squash.
-          ctx.rotate(-18 * Math.PI / 180);
-          ctx.scale(1.06, 0.92);
-        }
-        ctx.drawImage(spr, -r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
+      // Struggle strip while flying through the air (own poses, no fake lean).
+      const frame = getFrame(y.def, 'struggle', y.t);
+      if (frame) {
+        ctx.drawImage(frame.img, frame.sx, 0, frame.side, frame.side, -r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
       } else {
-        ctx.fillStyle = y.def.color;
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-        ctx.stroke();
-        ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
-        ctx.fillText(y.def.emoji, 0, 0);
+        const spr = getSprite(y.def, 'kicked');
+        if (spr) {
+          if (!hasPose(y.def, 'kicked')) {
+            // One image per character: fake the kicked pose with a backward lean + squash.
+            ctx.rotate(-18 * Math.PI / 180);
+            ctx.scale(1.06, 0.92);
+          }
+          ctx.drawImage(spr, -r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
+        } else {
+          ctx.fillStyle = y.def.color;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+          ctx.stroke();
+          ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
+          ctx.fillText(y.def.emoji, 0, 0);
+        }
       }
       ctx.restore();
     }

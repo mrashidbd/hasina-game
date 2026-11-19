@@ -57,11 +57,13 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `js/data/sounds.js` | `SOUNDS`: sound id → optional `file` + `synth` fallback + volume |
 | `js/assets.js` | `preloadImages(onLoad)`, `getSprite(def, pose)` (null → draw emoji); only loads manifest files |
 | `js/data/asset-manifest.js` | **Generated** list of art/sound files present in `assets/` + `spritePaths()`. Run `node tools/build-assets.mjs` after adding files |
+| `assets/ref_image/<name>/` | Reference photos of the real people (3 each). **Git-ignored**: never commit or publish them. Used only for the prompts in `docs/prompts/sprite-video-stars.md` (Hasina + 5 seniors, video) and `docs/prompts/sprite-animation.md` (11 small leaders, heroes, hole; image sheets) |
 | `assets/` | Art (`enemies/<id>/`, `heroes/<id>/`), sounds (`sfx/enemies|heroes|game/`), music. Layout in `assets/README.md`, prompts in `docs/prompts/` |
 | `tools/build-assets.mjs` | Scans `assets/`, writes the manifest, reports missing files per character |
 | `tools/gen-art.mjs`, `tools/chroma-key.mjs`, `tools/art/` | **Automated art**: agy image-generator → `art-src/` (git-ignored) → green-screen removal in headless Chromium → `assets/`. See `tools/art/README.md` |
 | `tools/cdp.mjs` | Headless-Chromium driver for smoke tests/screenshots: `SHOTS=<dir> node tools/cdp.mjs <script.mjs>` |
 | `js/share.js` | Share loop: `drawCard` (share cards + link preview), `rankOf`, `headline`, `shareResult`, challenge / WhatsApp / Facebook URLs. Tunables `CONFIG.share` |
+| `tools/build-frames.mjs` | Art v3: Flow clips/sheets in `art-src/enemies/<id>/` → `assets/enemies/<id>/<anim>-strip.webp` animation strips. `URL=about:blank node tools/cdp.mjs tools/build-frames.mjs` (env `ONLY=ids`), then `node tools/build-assets.mjs` |
 | `tools/og-image.mjs` | Renders `icons/og-image.jpg` (link preview) with `drawCard`: `node tools/cdp.mjs tools/og-image.mjs` |
 | `js/perks.js` | `BASE_MODS`: per-run modifiers copied to `game.mods` (the upgrade screen was removed 2026-11-12) |
 | `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |

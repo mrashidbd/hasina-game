@@ -23,6 +23,10 @@ export const CONFIG = {
     speedJitterMin: 0.9, // multiplier, lower speed jitter on spawn
     speedJitterMax: 1.1, // multiplier, upper speed jitter on spawn
     warnTime: 0.7, // s, how long a spawn is telegraphed before it appears
+    emergeTime: 0.45, // s, enemies climb out of their hole; tappable but immobile while emerging
+    holeCloseTime: 0.35, // s, the spawn hole shrinks shut after the enemy is out
+    holeMinPx: 34, // px, minimum spawn-hole width
+    holeSizeMul: 2.4, // multiplier, spawn-hole width = character radius (px) × this
     packSpread: 0.12, // map units, pack members spawn this far from the leader
     packTargetJitter: 0.1, // map units, pack target jitter around the leader target
     summonSpread: 0.15, // map units, summons appear this far from the summoner
@@ -106,6 +110,13 @@ export const CONFIG = {
   sprites: {
     heightMul: 3.6, // multiplier (tuned 2026-11-12 for the generated 3D art), full-body sprite height = rpx(r) × heightMul
     feetOffset: 0.9, // multiplier, feet sit at y + rpx(r) × feetOffset below the centre
+    anims: { // frame animation strips (assets/enemies/<id>/<anim>-strip.webp)
+      walk: { fps: 8, loop: true },      // fps, walk/lurk/sneak cycle
+      struggle: { fps: 8, loop: true },  // fps, roped and reeled in (Rope 'Em!)
+      jailed: { fps: 3, loop: true },    // fps, faces behind the jail bars
+      kicked: { fps: 9, loop: false },   // fps, booted and running away (holds the last frame)
+      emerge: { loop: false },           // driven by climb progress, not time
+    },
   },
   // Funny reaction bubbles ("Ouch!") over caught characters.
   fun: {

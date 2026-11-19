@@ -13,7 +13,7 @@ const GAME_SYNTH = {
   power: 'power', freeze: 'power', shield: 'shield',
   wave: 'wave', cleared: 'wave', warn: 'warn',
   boss: 'boss', leak: 'leak', over: 'over',
-  record: 'wave', tap: 'tap',
+  record: 'wave', tap: 'tap', pop: 'pop',
 };
 
 const entry = (file, synth) => ({ file, synth, volume: 1 });

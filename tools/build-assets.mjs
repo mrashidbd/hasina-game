@@ -39,7 +39,9 @@ const MUSIC = ['menu', 'game', 'boss'];
 
 // Walk assets/ (if it exists) and collect repo-relative paths with '/'.
 // Only loadable game assets are listed (.md and other docs are never requested).
-const ASSET_EXTS = ['.png', '.mp3', '.ogg'];
+// .webp is the animation-strip format; ref_image/ is skipped because it holds
+// git-ignored reference photos that the game must never request or ship.
+const ASSET_EXTS = ['.png', '.mp3', '.ogg', '.webp'];
 function scan(dir, prefix, out) {
   let entries;
   try {
@@ -49,8 +51,9 @@ function scan(dir, prefix, out) {
   }
   for (const e of entries) {
     const rel = `${prefix}/${e.name}`;
-    if (e.isDirectory()) scan(path.join(dir, e.name), rel, out);
-    else if (e.isFile() && ASSET_EXTS.includes(path.extname(e.name))) out.push(rel);
+    if (e.isDirectory()) {
+      if (e.name !== 'ref_image') scan(path.join(dir, e.name), rel, out);
+    } else if (e.isFile() && ASSET_EXTS.includes(path.extname(e.name))) out.push(rel);
   }
 }
 
@@ -83,17 +86,28 @@ lines.push('  for (const pose of poses) out[pose] = `assets/${kind}/${id}/${pose
 lines.push('  return out;');
 lines.push('}');
 lines.push('');
+lines.push('// Animation strips: assets/<kind>/<id>/<anim>-strip (webp), one row of square frames.');
+lines.push('// Anims missing on disk are still listed; assets.js checks them against ASSET_FILES.');
+lines.push('export function animPaths(kind, id, anims) {');
+lines.push('  const out = {};');
+lines.push('  for (const anim of anims) out[anim] = `assets/${kind}/${id}/${anim}-strip.webp`;');
+lines.push('  return out;');
+lines.push('}');
+lines.push('');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, lines.join('\n'));
 console.log(`wrote ${path.relative(root, outPath)} (${files.length} file${files.length === 1 ? '' : 's'})`);
 
 // ---- short present/missing report ----------------------------------------
+const ENEMY_ANIMS = ['walk', 'struggle', 'jailed', 'emerge', 'kicked'];
 for (const id of ENEMIES) {
   const missing = ENEMY_POSES.filter((p) => !known.has(`assets/enemies/${id}/${p}.png`));
   if (!soundPresent(`assets/sfx/enemies/${id}`)) missing.push('sfx');
   const opt = ENEMY_OPTIONAL.filter((p) => !known.has(`assets/enemies/${id}/${p}.png`));
   const optNote = opt.length ? ` (optional, not yet: ${opt.join(', ')})` : '';
-  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}${optNote}`);
+  const strips = ENEMY_ANIMS.filter((a) => known.has(`assets/enemies/${id}/${a}-strip.webp`));
+  const stripNote = strips.length ? ` (strips: ${strips.join(', ')})` : ' (strips: none)';
+  console.log(`${id}: ${missing.length === 0 ? 'complete' : `missing ${missing.join(', ')}`}${optNote}${stripNote}`);
 }
 for (const id of HEROES) {
   const missing = HERO_POSES.filter((p) => !known.has(`assets/heroes/${id}/${p}.png`));

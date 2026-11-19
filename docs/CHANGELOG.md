@@ -3,6 +3,59 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-19 — Art v3 in the game: animation strips
+- **`tools/build-frames.mjs`** (Claude): Flow clips/sheets in `art-src/enemies/<id>/` → 63 strips
+  `assets/enemies/<id>/<anim>-strip.webp` (256 px square frames, feet at 96%, ~3.2 MB in all) and a new
+  384 px `walk.png` per character (first walk frame), so the how-to roster, share cards and every
+  fallback show the new art too (the old Nov-12 stills are replaced).
+- **Engine** (GLM-5.3, reviewed by Claude): `animPaths()` in the manifest, `def.anims`,
+  `CONFIG.sprites.anims` (fps/loop), `assets.js` `hasAnim/getFrame/getFrameAt` (walk strips preload,
+  the rest lazy). `drawEnemy`: walk / emerge (by climb progress) / struggle (roped) / frozen = frame 0;
+  `drawFleeing`: kicked; Rope 'Em! jail: jailed faces; yanks: struggle. Missing strip → old static path.
+  `build-assets.mjs` lists `.webp` and skips `assets/ref_image/` (a photo there is .webp). Claude
+  removed a needless string-splitting trick from the generated `animPaths`.
+- Tested headless at 390×844 in both modes (emerge, walk, jail, flee); no page errors. Not tested on a
+  real phone yet. SW stays `kto-v15` (not shipped yet). Nothing committed.
+- `assets/gen_images/` (untracked, added by the user) is not used by the game.
+
+## 2026-11-18 (evening) — new character art generated in Google Flow (Claude driving Chrome)
+- Flow project "KTO sprites v3" (the user's account). **17 likeness masters** in `art-src/enemies/<id>/master.jpg`
+  (Hasina's was made by the user). Video clips (walk, struggle, jailed, emerge, kicked; 720p, 3 s) for
+  `hasina`, `quader`, `nanok`, `taposh`, `shamim`, `arafat` → `art-src/enemies/<id>/<anim>.mp4`.
+  The **33 P1 sprite sheets** (walk/run 3×2, struggle 2×2, jailed 2×2) for the 11 small leaders →
+  `art-src/enemies/<id>/<anim>-sheet.jpg`. Chrome had blocked the downloads until the user allowed
+  automatic downloads for flow.google.com (2026-11-19). Jailed sheets for zakir, saddam, ferdous and mahi are
+  full-body rather than head-and-shoulders (crop the head).
+- Mistake caught: the first 5 Quader clips animated his real photo (the Flow "character" keeps the
+  photo as its main image). They were trashed and redone from the uploaded cartoon master. Workflow
+  notes are now in both prompt docs.
+- `assets/ref_image/maruf/` was renamed to `murad/` with Murad Hasan photos: `murad` block updated.
+- `emerge` didn't rise from below for Quader and Taposh (P2; the game fakes it). Struggle clips draw a rope.
+- Not done: sheet/frame tool, engine frame support, hero sheets (Part B), nothing committed.
+
+## 2026-11-18 — spawn holes, sprite-animation prompts, Rope 'Em! scoring options
+- **Spawn holes** (both modes; coded by opencode + GLM-5.3, reviewed by Claude): the "!"
+  warning ring is replaced by a hole that pops open, the crook climbs out (0.45 s, tappable,
+  not moving) and the hole closes. Hasina's hole is gold with a 👑. New `CONFIG.spawn`
+  values, `sfx.pop`. Claude's fixes: a hit or rope while climbing finishes the climb (dodge or
+  pull would leave the body half-clipped); a lighter rim for contrast. Tested headless at
+  390×844 in both modes; no page errors. SW `kto-v15`.
+- **`docs/prompts/sprite-animation.md`:** prompts to turn the reference photos into a likeness
+  master per character, then walk/struggle/jailed/emerge/kicked sprite sheets (image AI) or
+  clips (video AI). It has likeness notes for all 17 people from the photos. The sheet tool
+  and the engine frame support are not built yet. Split into two files after the user's
+  side chat: `sprite-video-stars.md` (Hasina + 5 seniors, Google Flow video; Flow is 16:9
+  only, so the master is 16:9 with the character centred at ~80% height, and Claude crops
+  square frames) and `sprite-animation.md` (11 small leaders, full hero sheet prompts on
+  magenta, an optional hand-made hole sheet; all square).
+- `assets/ref_image/` (51 photos added by the user) is now **git-ignored**: they are press
+  photos of real people, and anything under `assets/` would be published on the live site.
+- The folder `maruf/` doesn't match the roster id `murad`, and the current `murad` art doesn't
+  match the photos. Waiting on the user.
+- **Rope 'Em! scoring:** found 4 loopholes (Hasina's escape is free, difficulty only rises with
+  lockups, …). Options A–D are in `docs/PLAN-lasso.md`; waiting on the user's choice.
+- Not committed yet.
+
 ## 2026-11-17 — share loop live (`main`, SW `kto-v14`)
 - Deployed and smoke-tested on the live site. Reworded two English lines that read "1 times"
   (headline and challenge text); Bangla unchanged.

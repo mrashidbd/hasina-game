@@ -9,7 +9,7 @@ import { BASE_MODS } from './perks.js';
 import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
-import { getSprite, hasPose } from './assets.js';
+import { getSprite, getFrame, getFrameAt, hasPose, hasAnim } from './assets.js';
 
 export const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
@@ -22,6 +22,27 @@ export function weighted(pool) {
   for (const [k, w] of pool) { if ((r -= w) <= 0) return k; }
   return pool[0][0];
 }
+
+/** Ease-out-cubic: fast rise, soft landing (climbing out of a hole). */
+export const easeOutCubic = (k) => 1 - (1 - k) ** 3;
+/** Ease-out-back: slight overshoot, so holes "pop" open instead of growing flat. */
+export const easeOutBack = (k) => {
+  const c = 1.70158;
+  const p = k - 1;
+  return 1 + (c + 1) * p ** 3 + c * p ** 2;
+};
+
+// Rendering-only spawn-hole values (visuals, not balance; sizes live in CONFIG.spawn).
+const HOLE_FX = {
+  flat: 0.38, // ellipse height = width × this
+  rimPx: 3, // dirt rim thickness
+  rim: '#9a6b3c', // brown dirt rim (light enough to read on the dark map)
+  mainRim: '#ffd700', // Hasina gets a gold rim
+  glow: 'rgba(255,215,0,0.75)', // soft gold glow around her hole
+  dirt: '#a07448', // dirt speck colour
+  crownPx: 18, // her 👑 bobs this far above the hole
+  popS: 0.2, // s, unannounced holes (packs/summons) pop open this fast
+};
 
 export class Game {
   constructor(canvas, hooks = {}) {
@@ -58,6 +79,7 @@ export class Game {
     this.powerups = [];
     this.queue = [];
     this.warnings = []; // telegraphed spawns: { type, p, t }
+    this.holes = []; // spawn holes in the ground: { x, y, w (px), t, phase, main }
     this.mods = { ...BASE_MODS }; // run modifiers (values in js/perks.js)
     this.lastQuipT = -10; // game time of the last new bubble (cooldown gate)
     this.spawnT = 0;
@@ -70,6 +92,7 @@ export class Game {
     this.mainCount = 0;
     this.leakFlash = 0;
     this.lastWarnSound = -1;
+    this.lastPopSound = -1; // game time of the last "out of the hole" pop (throttle)
   }
 
   // ---------------------------------------------------------------- layout
@@ -218,11 +241,14 @@ export class Game {
     return null;
   }
 
-  /** Pick a spawn point now and show a warning there; the intruder appears later. */
+  /** Pick a spawn point now and open a hole there; the intruder climbs out later. */
   warn(type) {
     const p = this.spawnPoint();
     if (!p) return;
-    this.warnings.push({ type, p, t: CONFIG.spawn.warnTime });
+    const w = { type, p, t: CONFIG.spawn.warnTime };
+    // The hole opens (pops) while the warning counts down — it replaced the old ring.
+    w.hole = this.addHole(p.x, p.y, CHARACTERS[type], 'open');
+    this.warnings.push(w);
     // Rate-limited spawn-warning sound (at most one per warnThrottle seconds).
     if (this.time - this.lastWarnSound >= CONFIG.waves.warnThrottle) {
       this.lastWarnSound = this.time;
@@ -233,8 +259,10 @@ export class Game {
   /**
    * `primary` = a normal wave spawn at a border spawn point (gets the fairness speed
    * scaling and spawns its whole pack). Summons/splits pass `at` without `primary`.
+   * `emerge` = climb out of a hole; splitter children skip it (they come out of the
+   * kicked character, not out of the ground).
    */
-  spawn(type, at = null, primary = !at) {
+  spawn(type, at = null, primary = !at, emerge = true) {
     const def = CHARACTERS[type];
     const p = at || this.spawnPoint();
     if (!p) return;
@@ -250,6 +278,7 @@ export class Game {
       t: 0, seed: Math.random() * 10, hitFlash: 0, hop: 0, summonT: def.summons?.every ?? 0,
       home: { x: p.x, y: p.y }, facing: 1,
     };
+    if (emerge) this.emergeAt(e, p, def);
     if (def.tier === 1) {
       e.hp = e.maxHp = def.hp + this.mainCount * CONFIG.waves.mainHpPerAppearance; // tougher every appearance
       this.mainCount++;
@@ -266,6 +295,81 @@ export class Game {
           tx: p.tx + rand(-CONFIG.spawn.packTargetJitter, CONFIG.spawn.packTargetJitter), ty: p.ty + rand(-CONFIG.spawn.packTargetJitter, CONFIG.spawn.packTargetJitter),
         });
       }
+    }
+  }
+
+  /** True while the enemy is still climbing out of its spawn hole. */
+  isEmerging(e) { return e.emergeT > 0; }
+
+  /**
+   * The enemy climbs out of a hole. A telegraphed spawn reuses the hole its
+   * warning opened at the same spot; packs and summons (no warning time) get
+   * one that pops open right away, already in the emerge phase.
+   */
+  emergeAt(e, p, def) {
+    let hole = this.holes.find((h) => h.phase === 'open' && !h.e && h.x === p.x && h.y === p.y);
+    if (!hole) hole = this.addHole(p.x, p.y, def, 'emerge');
+    hole.phase = 'emerge';
+    hole.e = e;
+    e.hole = hole;
+    e.emergeT = CONFIG.spawn.emergeTime;
+  }
+
+  /** Open a spawn hole sized to who is coming out (CONFIG.spawn). */
+  addHole(x, y, def, phase) {
+    const w = Math.max(CONFIG.spawn.holeMinPx, this.rpx(def.radius) * CONFIG.spawn.holeSizeMul);
+    // 10–12 jittered lumps make the dirt rim look dug rather than drawn.
+    const lumps = [];
+    const n = 10 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) lumps.push({ a: (i / n) * Math.PI * 2 + rand(-0.25, 0.25), d: rand(0.9, 1.12), s: rand(1.6, 3.4) });
+    const hole = { x, y, w, t: 0, phase, main: def.tier === 1, lumps, seed: Math.random() * 10, e: null };
+    this.holes.push(hole);
+    for (let i = 0; i < 3; i++) this.dirtFlick(hole); // dirt kicks up as it opens
+    return hole;
+  }
+
+  /** One brown dirt speck flicks out of the hole rim (burst()-style particle). */
+  dirtFlick(h) {
+    const a = rand(0, Math.PI * 2);
+    const sp = rand(50, 170);
+    this.particles.push({
+      x: this.sx(h.x) + Math.cos(a) * h.w * 0.25, y: this.sy(h.y) + Math.sin(a) * h.w * 0.1,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 70, // biased upwards, like kicked-up dirt
+      life: rand(0.3, 0.7), max: 0.7, color: HOLE_FX.dirt, size: rand(2, 5),
+    });
+  }
+
+  /**
+   * Hole lifecycle: 'open' while telegraphed → 'emerge' while its enemy climbs
+   * out → 'close' once the enemy is out (or was removed early — e.g. caught or
+   * roped mid-climb). Runs from updateEffects so holes also open/close during
+   * the wave break, and freezes while paused like the kicks.
+   */
+  updateHoles(dt) {
+    for (const h of this.holes) {
+      h.t += dt;
+      if (h.phase === 'open') {
+        // Dirt keeps flicking out of the rim while the hole opens.
+        if (h.t < CONFIG.spawn.warnTime && Math.random() < 0.4) this.dirtFlick(h);
+        // Its warning never matured (the run ended mid-telegraph): close up.
+        if (h.t > CONFIG.spawn.warnTime + CONFIG.spawn.holeCloseTime * 2) { h.phase = 'close'; h.t = 0; }
+      } else if (h.phase === 'emerge' && (!h.e || h.e.emergeT <= 0 || !this.enemies.includes(h.e))) {
+        h.phase = 'close'; // enemy is out — or was caught before finishing the climb
+        h.t = 0;
+      }
+    }
+    this.holes = this.holes.filter((h) => h.phase !== 'close' || h.t < CONFIG.spawn.holeCloseTime);
+  }
+
+  /** Fully out of the hole: a little hop, brown dust, and a rate-limited pop. */
+  emergeOut(e) {
+    e.emergeT = 0;
+    e.hop = 1;
+    this.burst(e.x, e.y, HOLE_FX.dirt, 8);
+    // Throttled like the warn sound, so a pack emerging together pops once.
+    if (this.time - this.lastPopSound >= CONFIG.waves.warnThrottle) {
+      this.lastPopSound = this.time;
+      sfx.pop();
     }
   }
 
@@ -304,6 +408,8 @@ export class Game {
   }
 
   damage(e, amount, heroId = null) {
+    // A hit knocks it fully out of the hole (knockback/dash would leave it half-clipped).
+    if (this.isEmerging(e)) this.emergeOut(e);
     e.hp -= amount;
     e.hitFlash = CONFIG.combat.hitFlashTime;
     if (e.hp > 0) {
@@ -368,7 +474,8 @@ export class Game {
       const x = e.x + (dx / d) * CONFIG.combat.splitterPush + (-dy / d) * side;
       const y = e.y + (dy / d) * CONFIG.combat.splitterPush + (dx / d) * side;
       if (pointInPoly(BD, x, y)) continue;
-      this.spawn(kinds[Math.floor(Math.random() * kinds.length)], { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side });
+      // Splitter children come out of the kicked character: no hole, no emerge.
+      this.spawn(kinds[Math.floor(Math.random() * kinds.length)], { x, y, tx: e.tx + (-dy / d) * side, ty: e.ty + (dx / d) * side }, false, false);
     }
   }
 
@@ -513,6 +620,9 @@ export class Game {
         f.traveled += Math.hypot(f.vx, f.vy) * dt;
       }
       this.fleeing = this.fleeing.filter((f) => f.traveled < CONFIG.kick.fleeDistancePx);
+      // Spawn holes age here too, so they keep opening/closing during the wave
+      // break (and pause freezes them, like the kicks above).
+      this.updateHoles(dt);
     }
   }
 
@@ -552,6 +662,13 @@ export class Game {
       e.t += dt;
       e.hitFlash = Math.max(0, e.hitFlash - dt);
       if (e.hop > 0) e.hop = Math.max(0, e.hop - dt / 0.25);
+      // Still climbing out of the hole: tappable, but no walking, summoning
+      // or breach checks until it is fully out.
+      if (this.isEmerging(e)) {
+        e.emergeT -= dt;
+        if (e.emergeT <= 0) this.emergeOut(e);
+        continue;
+      }
       if (frozen) continue;
       const tx = e.phase === 0 ? e.tx : DHAKA[0];
       const ty = e.phase === 0 ? e.ty : DHAKA[1];
@@ -715,8 +832,8 @@ export class Game {
       ctx.globalAlpha = 1;
     }
 
-    // spawn warnings
-    for (const w of this.warnings) this.drawWarning(w, t);
+    // spawn holes in the ground (they replaced the dashed warning rings)
+    for (const h of this.holes) this.drawHole(h, t);
 
     // fleeing intruders (before live enemies)
     for (const f of this.fleeing) this.drawFleeing(f, t);
@@ -861,23 +978,63 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 
-  drawWarning(w, t) {
+  /**
+   * A spawn hole in the ground: a dark ellipse with a dirt rim that pops open
+   * (ease-out-back) while the spawn is telegraphed, stays open while its enemy
+   * climbs out, then shrinks shut and fades. Hasina's hole gets a gold rim, a
+   * soft glow and her 👑 bobbing above it, so the old ring's "she's coming"
+   * cue lives on. Holes are pure decoration — they never block taps.
+   */
+  drawHole(h, t) {
     const { ctx } = this;
-    const x = this.sx(w.p.x), y = this.sy(w.p.y);
-    const main = CHARACTERS[w.type].tier === 1;
-    const k = 1 - w.t / CONFIG.spawn.warnTime; // 0 → 1 as the spawn approaches
-    const color = main ? '255,215,0' : '255,90,106';
-    const r = (main ? 34 : 22) * (1.4 - 0.6 * k);
-    ctx.globalAlpha = 0.35 + 0.5 * k;
-    ctx.strokeStyle = `rgb(${color})`;
-    ctx.lineWidth = main ? 4 : 2.5;
-    ctx.setLineDash([6, 5]);
-    ctx.beginPath(); ctx.arc(x, y, r, t * 3, t * 3 + Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = `900 ${main ? 22 : 16}px system-ui, sans-serif`;
-    ctx.fillStyle = `rgb(${color})`;
-    ctx.fillText(main ? CHARACTERS[w.type].emoji : '!', x, y);
-    ctx.globalAlpha = 1;
+    const S = CONFIG.spawn;
+    const x = this.sx(h.x), y = this.sy(h.y);
+    // How wide open the ellipse is right now (eased 0..1).
+    let k;
+    if (h.phase === 'open') k = easeOutBack(clamp(h.t / S.warnTime, 0, 1));
+    else if (h.phase === 'emerge') k = easeOutBack(clamp(h.t / HOLE_FX.popS, 0, 1)); // unannounced holes pop straight open
+    else k = 1 - clamp(h.t / S.holeCloseTime, 0, 1); // closing: shrink back to nothing
+    const w = h.w * Math.max(0, k);
+    if (w < 2) return;
+    const hh = w * HOLE_FX.flat;
+    const fade = h.phase === 'close' ? Math.max(0, 1 - h.t / S.holeCloseTime) : 1;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    const rim = h.main ? HOLE_FX.mainRim : HOLE_FX.rim;
+    if (h.main) { // soft gold glow so her hole stands out from the dirt ones
+      ctx.shadowColor = HOLE_FX.glow;
+      ctx.shadowBlur = 16;
+    }
+    // dark inside: radial gradient squeezed into the ellipse by the y scale
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, HOLE_FX.flat);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w / 2);
+    g.addColorStop(0, '#050505');
+    g.addColorStop(1, '#1d140c');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, w / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // dirt rim + the irregular lumps picked when the hole opened
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = HOLE_FX.rimPx;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w / 2, hh / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = rim;
+    for (const l of h.lumps) {
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(l.a) * (w / 2) * l.d, y + Math.sin(l.a) * (hh / 2) * l.d, l.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    if (h.main) { // her crown bobs above the hole: "she's coming"
+      ctx.font = `20px ${EMOJI_FONT}`;
+      ctx.fillText('👑', x, y - HOLE_FX.crownPx - Math.sin(t * 5 + h.seed) * 3);
+    }
+    ctx.restore();
   }
 
   /** Big HP bar for the main target, just under the HUD. */
@@ -905,6 +1062,17 @@ export class Game {
     const { ctx } = this;
     const x = this.sx(e.x), y = this.sy(e.y) - (e.hop > 0 ? Math.sin((1 - e.hop) * Math.PI) * CONFIG.kick.fleeHopPx * 0.5 : 0);
     const r = this.rpx(e.r);
+    const emerging = this.isEmerging(e);
+    if (emerging) {
+      // Rising out of the hole: nothing below the hole's centre line is drawn,
+      // so the body looks like it comes up out of the ground.
+      ctx.save();
+      const line = this.sy(e.hole?.y ?? e.y);
+      const big = 1e5; // generous: keeps everything above the hole line visible
+      ctx.beginPath();
+      ctx.rect(-big, -big, 2 * big, big + line);
+      ctx.clip();
+    }
     ctx.globalAlpha = this.stealthAlpha(e);
 
     if (e.near < CONFIG.combat.dangerDistance) {
@@ -919,9 +1087,11 @@ export class Game {
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
     }
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(x, y + r * 0.9, r * 0.8, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // shadow — only once it stands on the ground, not while climbing out
+    if (!emerging) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.9, r * 0.8, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    }
     const bob = Math.sin(e.t * 10 + e.seed) * (this.freezeT > 0 ? 0 : 2);
     const frozen = this.freezeT > 0;
     // Frozen uses the idle pose (getSprite falls back to walk).
@@ -932,58 +1102,79 @@ export class Game {
       // Full-body, feet-anchored, no coloured circle. Art faces right.
       const S = CONFIG.sprites;
       const h = r * S.heightMul;
-      const feetY = y + bob + r * S.feetOffset;
+      // Climbing out: pushed down by the still-hidden part of the body.
+      const out = emerging ? easeOutCubic(1 - e.emergeT / CONFIG.spawn.emergeTime) : 1;
+      // Animation strip frame, or null (missing strip / still loading) → the
+      // static sprite + faked poses below. Emerge follows the climb progress,
+      // roped crooks struggle, frozen holds walk frame 0, otherwise the walk
+      // cycle runs (e.seed desyncs crowds walking in step).
+      let frame = null;
+      let emergeStrip = false; // an emerge strip rises by itself: no push-down
+      if (emerging && hasAnim(e.def, 'emerge')) {
+        frame = getFrameAt(e.def, 'emerge', out);
+        emergeStrip = !!frame;
+      } else if (pose === 'kicked') frame = getFrame(e.def, 'struggle', e.t);
+      else if (frozen) frame = getFrameAt(e.def, 'walk', 0);
+      else if (pose === 'walk') frame = getFrame(e.def, 'walk', e.t + e.seed);
+      // Strips carry their own bounce, so drop the code bob when one is playing.
+      const feetY = y + (frame ? 0 : bob) + r * S.feetOffset + (emergeStrip ? 0 : (1 - out) * h);
       ctx.save();
       ctx.translate(x, feetY);
       if ((e.facing ?? 1) < 0) ctx.scale(-1, 1);
-      if (pose === 'kicked' && !hasPose(e.def, 'kicked')) {
-        // One image per character: fake the kicked pose with a backward lean + squash.
-        ctx.rotate(-18 * Math.PI / 180);
-        ctx.scale(1.06, 0.92);
-      } else if (pose === 'walk') {
-        ctx.rotate(Math.sin(e.t * 8 + e.seed) * 4 * Math.PI / 180); // gentle waddle
+      if (!frame) { // strips have real poses: skip the fakes
+        if (pose === 'kicked' && !hasPose(e.def, 'kicked')) {
+          // One image per character: fake the kicked pose with a backward lean + squash.
+          ctx.rotate(-18 * Math.PI / 180);
+          ctx.scale(1.06, 0.92);
+        } else if (pose === 'walk') {
+          ctx.rotate(Math.sin(e.t * 8 + e.seed) * 4 * Math.PI / 180); // gentle waddle
+        }
       }
       if (e.hitFlash > 0 && 'filter' in ctx) ctx.filter = 'brightness(2.2)';
-      ctx.drawImage(sprite, -h / 2, -h, h, h);
+      if (frame) ctx.drawImage(frame.img, frame.sx, 0, frame.side, frame.side, -h / 2, -h, h, h);
+      else ctx.drawImage(sprite, -h / 2, -h, h, h);
       if ('filter' in ctx) ctx.filter = 'none';
       ctx.restore();
       if (frozen) {
         ctx.fillStyle = 'rgba(160,230,255,0.45)';
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
-      // HP bar above the sprite top.
-      if (e.maxHp > 1) {
+      // HP bar above the sprite top (once it is fully out of the hole).
+      if (!emerging && e.maxHp > 1) {
         const bw = r * 2, bh = 5;
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(x - bw / 2, feetY - h - 11, bw, bh);
         ctx.fillStyle = e.hp / e.maxHp > 0.4 ? '#7cffb2' : '#ff5a5a';
         ctx.fillRect(x - bw / 2, feetY - h - 11, bw * (e.hp / e.maxHp), bh);
       }
-      // Name tag below the feet.
-      if (e.def.tier <= 2) {
+      // Name tag below the feet (once it is fully out of the hole).
+      if (!emerging && e.def.tier <= 2) {
         ctx.font = `700 ${Math.max(9, r * 0.45)}px system-ui, sans-serif`;
         ctx.fillStyle = '#fff';
         ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, feetY + 10);
       }
       ctx.globalAlpha = 1;
+      if (emerging) ctx.restore();
       return;
     }
 
     // No sprite: coloured circle + emoji, exactly as before.
+    const out = emerging ? easeOutCubic(1 - e.emergeT / CONFIG.spawn.emergeTime) : 1;
+    const cy = y + (1 - out) * r * 2; // pushed down by the still-hidden part
     ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.def.color;
-    ctx.beginPath(); ctx.arc(x, y + bob, r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, cy + bob, r, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.stroke();
     ctx.font = `${r * 1.25}px ${EMOJI_FONT}`;
-    ctx.fillText(e.def.emoji, x, y + bob + r * 0.06);
+    ctx.fillText(e.def.emoji, x, cy + bob + r * 0.06);
     if (frozen) {
       ctx.fillStyle = 'rgba(160,230,255,0.45)';
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
     }
 
     // HP bar
-    if (e.maxHp > 1) {
+    if (!emerging && e.maxHp > 1) {
       const bw = r * 2, bh = 5;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(x - bw / 2, y - r - 11, bw, bh);
@@ -991,12 +1182,13 @@ export class Game {
       ctx.fillRect(x - bw / 2, y - r - 11, bw * (e.hp / e.maxHp), bh);
     }
     // name tag
-    if (e.def.tier <= 2) {
+    if (!emerging && e.def.tier <= 2) {
       ctx.font = `700 ${Math.max(9, r * 0.45)}px system-ui, sans-serif`;
       ctx.fillStyle = '#fff';
       ctx.fillText(tr(`char.${e.type}`).toUpperCase(), x, y + r + 10);
     }
     ctx.globalAlpha = 1;
+    if (emerging) ctx.restore();
   }
 
   /** Hero pops up behind the intruder (screen px): ready pose, then kick. */
@@ -1076,6 +1268,10 @@ export class Game {
     const tilt = Math.sin(f.traveled * 0.05 + f.spin) * K.fleeWobbleDeg * Math.PI / 180;
     const kickedArt = hasPose(def, 'kicked');
     const sprite = getSprite(def, 'kicked');
+    // Kicked strip animates the flee; its time base is seconds since the kick
+    // (traveled / speed), so it holds the last frame as the crook fades out.
+    const frame = hasAnim(def, 'kicked')
+      ? getFrame(def, 'kicked', f.traveled / K.fleeSpeedPx) : null;
 
     ctx.globalAlpha = alpha;
     if (def.tier === 1) { // gold aura kept while fleeing
@@ -1092,7 +1288,12 @@ export class Game {
     ctx.translate(f.x, f.y - hop);
     ctx.rotate(tilt);
     if (f.vx < 0) ctx.scale(-1, 1); // mirrored when moving left
-    if (sprite) {
+    if (frame) {
+      // Full-body, feet-anchored (the strip leans/poses itself).
+      const S = CONFIG.sprites;
+      const h = r * S.heightMul;
+      ctx.drawImage(frame.img, frame.sx, 0, frame.side, frame.side, -h / 2, r * S.feetOffset - h, h, h);
+    } else if (sprite) {
       // Full-body, feet-anchored, no coloured circle (kicked pose).
       const S = CONFIG.sprites;
       const h = r * S.heightMul;

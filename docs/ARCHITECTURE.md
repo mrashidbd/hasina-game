@@ -27,6 +27,21 @@ an extension point).
   hero `ready.png`). `hasPose(def, pose)` tells whether a pose file exists; when it doesn't,
   poses are faked with transforms: walk = ±4° waddle, kicked = −18° lean + squash, hero kick
   = ready leaning +14° with an 18% lunge and 💥, lasso throw/pull = ready leaning +10°/−12°.
+- **Animation strips (Art v3, 2026-11-19):** `assets/enemies/<id>/<anim>-strip.webp`, one row
+  of square frames (frame count = width / height), same layout as `walk.png` (facing right, feet
+  at 96%). Anims: `walk`, `struggle`, `jailed` (head-and-shoulders), `emerge`, `kicked`; all 17
+  have the first three, Hasina + 5 seniors also have emerge/kicked. Paths come from
+  `animPaths()` in the manifest (`def.anims`), timing from `CONFIG.sprites.anims` (fps, loop).
+  `assets.js`: `hasAnim`, `getFrame(def, anim, t)`, `getFrameAt(def, anim, k)` (progress, for
+  emerge); walk strips preload, the rest load on first use. When a frame is available it replaces
+  the static sprite and its fakes (waddle, lean/squash, bob); otherwise the old path is used.
+  Mapping: walking → walk; Rope 'Em! roped (`pose 'kicked'`) and yanked → struggle; jail → jailed;
+  classic flee → kicked; climbing out of a hole → emerge (by climb progress).
+  Built by `tools/build-frames.mjs` from `art-src/enemies/<id>/` (Flow clips `<anim>.mp4` and
+  sheets `<anim>-sheet.jpg`): `URL=about:blank node tools/cdp.mjs tools/build-frames.mjs`
+  (ffmpeg pulls clip frames; headless Chromium keys green, trims, aligns feet/head, writes 256 px
+  WebP; it also rewrites each `walk.png` still from the first walk frame), then
+  `node tools/build-assets.mjs`. About 3.2 MB for all 63 strips.
 - **Art pipeline** (`tools/art/README.md`): `tools/gen-art.mjs` asks agy's image-generator
   subagent for each character (prompts in `tools/art/prompts.mjs`, style `3d`) and collects
   the image from agy's brain folder into `art-src/` (git-ignored); `tools/chroma-key.mjs`
@@ -162,6 +177,15 @@ modes) / `updatePlay(dt)` (simulation), `nextWave()`, `spawn()`, `spawnPoint()`,
   `at` point; interval shrinks `0.05 s` per wave, min 1.8 s.
 - Splitters (`def.splits = { into, n }`): `catch()` → `split(e)` spawns `n` of `into`
   side by side, 0.1 units further from the border.
+- **Spawn holes (both modes, 2026-11-18).** `warn()` opens a hole (`this.holes`, phase
+  `'open'`, linked as `w.hole`) during `CONFIG.spawn.warnTime`. `spawn(type, at, primary,
+  emerge = true)` → `emergeAt()` reuses that hole (or pops one open for packs/summons) and
+  sets `e.emergeT = emergeTime` (0.45 s): the enemy is tappable/ropable but doesn't move,
+  summon, sneak or breach, and `drawEnemy` draws it rising and clipped at the hole's centre
+  line. `emergeOut()` ends it (hop, dust, throttled `sfx.pop`); a hit or a rope ends it
+  early. Then the hole closes (`holeCloseTime`). Splitter children pass `emerge = false`.
+  `updateHoles` runs in `updateEffects` (animates in breaks, freezes on pause). Hasina's
+  hole has a gold rim and a bobbing 👑. Visual constants: `HOLE_FX` in `game.js`.
 
 ### Enemy object
 ```js

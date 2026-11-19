@@ -96,6 +96,7 @@ const SYNTH = {
   kick: () => { noise(0.13, 0.12); tone(150, 0.16, { type: 'sine', vol: 0.2, slide: -90, delay: 0.03 }); },
   warn: () => { tone(1100, 0.06, { type: 'sine', vol: 0.05 }); tone(1100, 0.06, { type: 'sine', vol: 0.05, delay: 0.1 }); },
   tap: () => tone(700, 0.03, { type: 'sine', vol: 0.06 }),
+  pop: () => { noise(0.06, 0.08); tone(520, 0.08, { type: 'sine', vol: 0.08, slide: 260 }); },
 };
 
 /** Fetch and decode every sound file that is in the manifest. No-ops until the AudioContext exists. */
@@ -153,6 +154,7 @@ export const sfx = {
   record: () => play('record'),
   tap: () => play('tap'),
   warn: () => play('warn'),
+  pop: () => play('pop'),
   kick: () => play('kick'),
 };
 

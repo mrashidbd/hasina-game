@@ -83,3 +83,77 @@ lockup. Enemies: `walk`, `kicked` = being reeled, `idle` = face in the jail.
   v2.
 - v2: written by opencode with GLM-5.3 (`zai-coding-plan/glm-5.3`), then reviewed and tested
   by Claude. See CHANGELOG.
+
+## Scoring redesign (2026-11-18): options, waiting for the user's choice
+The user wants Rope 'Em! to become the main mode, so its scoring must reward catching Hasina.
+
+### The problem (checked in `js/lasso.js`)
+1. **Locking up Hasina ends the run**, so for points the best play is to *never* catch her:
+   keep jailing small crooks forever.
+2. **Her escape is free.** After `mainStay` (30 s) she slips away, and after `mainCooldown`
+   (20 s) she comes back. Nothing is lost.
+3. **Difficulty grows with lockups, not with time** (level = lockups / 6). A player who stops
+   catching keeps the game easy, so stalling is safe.
+4. The only way to lose is 3 sneak-ins. A good player blocks those for a long time.
+
+### Patterns other games use against this
+- **Time pressure with a time bonus.** Arcade bosses (Metal Slug, Street Fighter): beating the
+  boss sooner scores more, so waiting costs you.
+- **A loop of chapters with a growing boss.** Space Invaders and Pac-Man levels: clearing the
+  goal starts a harder round instead of ending the game. The score lives in the boss kills.
+- **Diminishing returns on side targets.** Small enemies are worth less the longer you farm.
+- **A clock the player can't stop.** Difficulty rises with time (Tetris gravity, Fruit Ninja
+  Arcade's 60 s), so stalling is never safe.
+- **Strikes.** Letting the main target get away is a visible mistake that costs something.
+
+### Options
+**A. Chapters (endless, she keeps coming back).** *Recommended.*
+- Locking Hasina up **clears the chapter** instead of ending the game.
+- She "gets bail", tunnels out of the jail and the next chapter starts harder: more crooks,
+  faster sneaks, and she pulls harder.
+- Points:
+  - Hasina's bounty is `1000 × chapter`;
+  - small crooks stay small;
+  - a chapter clear adds a time bonus (faster = more).
+- **Her escape costs a ❤️.** The run ends at 0 ❤️, like classic mode.
+- Why it fits:
+  - it is exactly the joke ("they keep trying to come back, we keep sending them back");
+  - farming is pointless because the bounty dominates;
+  - the share card gets "Jailed Hasina ×4".
+- Change: medium.
+
+**B. Deadline + time bonus (one fixed-length run).**
+- A visible clock, e.g. 3:00 ("her flight lands in…"). Hasina appears at random times: the
+  first time between 0:30 and 1:30, again after every escape.
+- Catch her = **win**, with a bonus for the time left (e.g. +20 points per second).
+- If the clock runs out she gets in. You lose and keep half your points.
+- Why it fits: very easy to understand and to compare scores; stalling only burns your bonus.
+- Cons: runs are always short, and the mode gets no "endless" feel.
+- Change: small.
+
+**C. Strikes and a shrinking bounty (keeps today's single win).**
+- Each escape is a strike, and her bounty drops: 1000 → 600 → 300.
+- **3 escapes = she reaches Dhaka = game over.**
+- While she is on the map, small crooks score nothing ("catch HER!").
+- Difficulty also rises with time, not only with lockups.
+- Why it fits: the smallest change to today's rules, and it closes all four loopholes.
+- Cons: still one win per run.
+- Change: small.
+
+**D. Hype meter (rising pressure).**
+- A "She's coming back!" meter fills by itself, and faster over time.
+- Lockups push it down a little. When it's full she breaks in: you lose.
+- Catch her = win, and a fuller meter at the time of the catch means more points.
+- Why it fits: it shows the social-media hype as a game mechanic, and it's very topical.
+- Cons: one more HUD element and more to explain, which goes against "simple for all ages".
+- Change: medium.
+
+### Extra ways to make it harder (can go with any option)
+- **Random timing:** wider random gaps before Hasina appears, and sometimes 2 sneak-ins at once.
+- **Decoys:** look-alikes in the same sari. Roping one costs time and combo, and the real one
+  has the gold glow.
+- **Jailbreak:** a senior leader (e.g. Quader) runs at the jail to free someone; stop him or
+  lose your last prisoner.
+- **Summons:** while Hasina is on the map, she calls in helpers who stand between her and the
+  rope.
+- **Combo decay:** the combo window shrinks as the chapter or level rises.

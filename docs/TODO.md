@@ -37,6 +37,17 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [ ] The UI (not the cards) still relies on the device's Bangla font; old Windows/Android may
       render it poorly. Consider using "KTO Bangla" for UI headings too.
 
+## Art v3 / sprite animation (2026-11-18)
+- [x] Masters for all 17 + clips for Hasina and the 5 seniors + tier-3 P1 sheets (generated in Flow, 2026-11-18).
+- [x] Frame tool `tools/build-frames.mjs` (key, slice, align feet/head, 256 px WebP strips; frames from MP4). 63 strips built 2026-11-19.
+- [x] Engine: frame animation for enemies (2026-11-19). Heroes still use stills.
+- [ ] Strip weight: ~3.2 MB total (walk strips preload ~0.9 MB). Consider 192 px or lower WebP quality if load time on 3G hurts.
+- [ ] Real-phone check of the animations (frame rate, look at small sizes).
+- [x] `maruf` folder renamed to `murad` by the user (Murad Hasan photos); prompts updated.
+- [x] All 33 tier-3 sheets downloaded to `art-src/enemies/<id>/<anim>-sheet.jpg` (2026-11-19).
+- [ ] Optional: redo `emerge` for `quader` and `taposh` (they don't rise from below).
+- [ ] Hero sheets (sprite-animation.md Part B) not generated yet.
+
 ## Content placeholders (user to decide)
 - [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).
 

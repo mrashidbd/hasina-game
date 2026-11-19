@@ -53,8 +53,9 @@ When you ship changes, bump `VERSION` in `sw.js` so installed players get the up
 
 ## Core loop
 1. A wave starts and intruders spawn **outside the India-facing border**: west, north and east.
-   They don't come from the sea or the Myanmar side. Each spawn is telegraphed by a flashing
-   **!** marker 0.7 s before the intruder appears (a gold 👑 for Hasina).
+   They don't come from the sea or the Myanmar side. Each one climbs out of a **hole** that
+   opens in the ground 0.7 s before (a gold hole with a 👑 for Hasina). While climbing out
+   (0.45 s) they can already be tapped but don't move yet.
 2. Each one walks to a point on the border and then heads for Dhaka.
 3. Before the run the player picks a **hero** (Farmer, Student ♂, Student ♀, Common People).
    The player **taps or clicks** intruders; the hero pops up and kicks them, and caught
