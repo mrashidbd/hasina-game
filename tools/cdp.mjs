@@ -11,12 +11,14 @@ import path from 'node:path';
 
 const base = `${process.env.HOME}/.cache/ms-playwright`;
 const dir = readdirSync(base).filter((d) => d.startsWith('chromium_headless_shell')).sort().pop();
-const bin = `${base}/${dir}/chrome-headless-shell-linux64/chrome-headless-shell`;
+// CHROME_BIN=<path to full chrome> runs real headless Chrome instead of the headless shell
+// (needed e.g. for service-worker client.navigate()).
+const bin = process.env.CHROME_BIN || `${base}/${dir}/chrome-headless-shell-linux64/chrome-headless-shell`;
 const W = Number(process.env.W || 1280), H = Number(process.env.H || 800);
 const SHOTS = process.env.SHOTS || path.join(tmpdir(), 'kto-shots');
 mkdirSync(SHOTS, { recursive: true });
 const port = 9300 + Math.floor(Math.random() * 500);
-const proc = spawn(bin, [`--remote-debugging-port=${port}`, `--window-size=${W},${H}`, '--no-sandbox',
+const proc = spawn(bin, [...(process.env.CHROME_BIN ? ['--headless=new'] : []), `--remote-debugging-port=${port}`, `--window-size=${W},${H}`, '--no-sandbox',
   `--user-data-dir=${path.join(tmpdir(), `kto-prof-${Date.now()}`)}`, 'about:blank'], { stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

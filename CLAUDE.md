@@ -61,9 +61,9 @@ Application → "Update on reload", otherwise you may see the cached old version
 | `assets/` | Art (`enemies/<id>/`, `heroes/<id>/`), sounds (`sfx/enemies|heroes|game/`), music. Layout in `assets/README.md`, prompts in `docs/prompts/` |
 | `tools/build-assets.mjs` | Scans `assets/`, writes the manifest, reports missing files per character |
 | `tools/gen-art.mjs`, `tools/chroma-key.mjs`, `tools/art/` | **Automated art**: agy image-generator → `art-src/` (git-ignored) → green-screen removal in headless Chromium → `assets/`. See `tools/art/README.md` |
-| `tools/cdp.mjs` | Headless-Chromium driver for smoke tests/screenshots: `SHOTS=<dir> node tools/cdp.mjs <script.mjs>` |
+| `tools/cdp.mjs` | Headless-Chromium driver for smoke tests/screenshots: `SHOTS=<dir> node tools/cdp.mjs <script.mjs>` (`CHROME_BIN=` for full Chrome) |
 | `js/share.js` | Share loop: `drawCard` (share cards + link preview), `rankOf`, `headline`, `shareResult`, challenge / WhatsApp / Facebook URLs. Tunables `CONFIG.share` |
-| `tools/build-frames.mjs` | Art v3: Flow clips/sheets in `art-src/enemies/<id>/` → `assets/enemies/<id>/<anim>-strip.webp` animation strips. `URL=about:blank node tools/cdp.mjs tools/build-frames.mjs` (env `ONLY=ids`), then `node tools/build-assets.mjs` |
+| `tools/build-frames.mjs` | Art v3: Flow clips/sheets in `art-src/enemies/<id>/` (green) and `art-src/heroes/<id>/` (magenta) → `assets/<kind>/<id>/<anim>-strip.webp` animation strips + 384 px PNG stills. `URL=about:blank node tools/cdp.mjs tools/build-frames.mjs` (env `ONLY=ids`), then `node tools/build-assets.mjs` |
 | `tools/og-image.mjs` | Renders `icons/og-image.jpg` (link preview) with `drawCard`: `node tools/cdp.mjs tools/og-image.mjs` |
 | `js/perks.js` | `BASE_MODS`: per-run modifiers copied to `game.mods` (the upgrade screen was removed 2026-11-12) |
 | `js/map.js` | Projection, projected map shapes (`BD`, `INDIA_EDGES`, neighbours, islands), labels, geometry helpers. Built from `js/data/map-bd.js` |
@@ -95,7 +95,8 @@ Application → "Update on reload", otherwise you may see the cached old version
    misses module errors (e.g. a duplicate import binding broke the whole page once). Use
    `node --input-type=module --check < file.js` and a headless-Chromium smoke test.
 7. **Any shipped change → bump `VERSION` in `sw.js`** (e.g. `kto-v3` → `kto-v4`), or
-   installed players keep the old cached build.
+   installed players keep the old cached build. With a new VERSION, open games reload
+   themselves onto the new build on their next visit (see ARCHITECTURE "Instant updates").
 8. Keep README's rule/point tables in sync with the code when balance changes
    (README is what players/maintainers read; it currently matches the code).
 9. Style: 2-space indent, single quotes, semicolons, small focused functions, short

@@ -3,6 +3,32 @@
 Newest first. Every work session adds an entry: date, what changed, why, and anything
 left unfinished. Keep entries short; details belong in commits and ARCHITECTURE.md.
 
+## 2026-11-19 (release) — instant updates for returning players; SW kto-v16
+- User request: players who played before should get the new release at once. `sw.js` now
+  installs and refreshes from the network (bypassing GitHub Pages' ~10 min browser cache), and
+  reloads open pages when a new version replaces an old one; `main.js` registers with
+  `updateViaCache: 'none'`, checks for an update on every load and reloads once on
+  `controllerchange`. Tested headless shell: deploy v16 → v17, one visit → page reloads itself onto
+  v17 in ~1 s. Full headless Chrome under CDP hung on service-worker calls (test-harness issue).
+  Old v15 pages get the new build on their next visit at the latest. `tools/cdp.mjs` gained `CHROME_BIN`.
+
+## 2026-11-19 (later) — hero art in Flow, realistic rope
+- **Heroes** (Claude in the user's Flow project): new masters for `farmer`, `studentM`, `studentF`,
+  `common` in the new 3D style (from their old `ready.png` + Quader's master as style reference,
+  magenta background) and 5 sheets each: kick 2×2, run 3×2, throw 2×2, pull 2×2, cheer 2×1 →
+  `art-src/heroes/<id>/` (git-ignored). **In the game:** `build-frames.mjs` now keys magenta for
+  heroes (despill only on the see-through fringe, so the flag's red dot and red clothes survive), writes
+  20 hero strips + new `ready/kick/run/throw/pull/cheer.png` stills (Claude). Playback (GLM-5.3, reviewed
+  by Claude): `HEROES[id].anims`, hero entries in `CONFIG.sprites.anims`, kick/run strips preload;
+  classic `drawKick` plays `kick` by kick progress; Rope 'Em! `heroFrame()`: run / throw (by `r.age`,
+  `FX.throwAnimTime`) / pull / cheer. Checked headless in both modes; no page errors. SW `kto-v16`.
+- **Rope** (Claude, user request "make the rope tightening realistic"): the loop now drops onto the
+  crook and cinches round the waist with a squeeze, wraps around the body (back half behind, front
+  half + knot in front), the rope sags when slack, goes taut as the tug meter fills and twangs after
+  each tap, with a twisted two-tone look. lasso.js only (`loopGeom`, `drawLoop`, `drawRopeLine`,
+  `ropeStroke`, `drawEnemy` override, `FX` rope values, `r.cinch`/`r.twang`). Checked headless
+  (1280×800 crops); not yet on a phone. Not committed.
+
 ## 2026-11-19 — Art v3 in the game: animation strips
 - **`tools/build-frames.mjs`** (Claude): Flow clips/sheets in `art-src/enemies/<id>/` → 63 strips
   `assets/enemies/<id>/<anim>-strip.webp` (256 px square frames, feet at 96%, ~3.2 MB in all) and a new

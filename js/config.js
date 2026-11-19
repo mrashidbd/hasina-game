@@ -116,6 +116,12 @@ export const CONFIG = {
       jailed: { fps: 3, loop: true },    // fps, faces behind the jail bars
       kicked: { fps: 9, loop: false },   // fps, booted and running away (holds the last frame)
       emerge: { loop: false },           // driven by climb progress, not time
+      // heroes (assets/heroes/<id>/<anim>-strip.webp)
+      kick: { loop: false },             // driven by kick progress, not time
+      run: { fps: 12, loop: true },      // fps, orbit/chase run cycle
+      throw: { loop: false },            // driven by rope-throw progress, not time
+      pull: { fps: 9, loop: true },      // fps, hand-over-hand reel cycle
+      cheer: { fps: 6, loop: true },     // fps, victory bounce after a lockup
     },
   },
   // Funny reaction bubbles ("Ouch!") over caught characters.

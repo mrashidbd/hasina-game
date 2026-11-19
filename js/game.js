@@ -1206,6 +1206,8 @@ export class Game {
     const fakeKick = !winding && !kickArt; // one image per hero: fake it with the ready pose
     const pose = winding || !kickArt ? 'ready' : 'kick';
     const sprite = getSprite(def, pose);
+    // the kick strip follows the kick's own progress (wind-up → kick → land)
+    const animFrame = hasAnim(def, 'kick') ? getFrameAt(def, 'kick', clamp(k.t / life, 0, 1)) : null;
     const cx = k.x + k.dirX * size * 0.55;
     const cy = k.y + k.dirY * size * 0.55;
 
@@ -1213,7 +1215,10 @@ export class Game {
     ctx.save();
     ctx.translate(k.x, k.y);
     if (fakeKick) ctx.translate(k.dirX * size * 0.18, k.dirY * size * 0.18); // lunge at the intruder
-    if (sprite) {
+    if (animFrame) {
+      if (k.dirX < 0) ctx.scale(-1, 1); // sprites face right
+      ctx.drawImage(animFrame.img, animFrame.sx, 0, animFrame.side, animFrame.side, -size / 2, -size / 2, size, size);
+    } else if (sprite) {
       if (k.dirX < 0) ctx.scale(-1, 1); // sprites face right
       if (fakeKick) ctx.rotate(14 * Math.PI / 180); // lean into the kick
       ctx.drawImage(sprite, -size / 2, -size / 2, size, size);

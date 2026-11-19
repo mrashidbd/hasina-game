@@ -381,5 +381,20 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches || na
 if (isIOS && !standalone) $('iosHint').classList.remove('hidden');
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // updateViaCache 'none': the browser always asks the server for a new sw.js (never the HTTP
+  // cache), so a deploy is picked up on the next visit; sw.js then reloads the page itself.
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update()) // look for a new release on every visit, not just once a day
+      .catch(() => {});
+  });
+  // A new release took over this page: reload once so the new code runs right away.
+  // (Skipped on the very first install, when there was no previous version.)
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
 }

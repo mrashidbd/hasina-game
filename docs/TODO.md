@@ -46,7 +46,8 @@ you notice but don't fix. The longer feature wishlist is in README.md → "Roadm
 - [x] `maruf` folder renamed to `murad` by the user (Murad Hasan photos); prompts updated.
 - [x] All 33 tier-3 sheets downloaded to `art-src/enemies/<id>/<anim>-sheet.jpg` (2026-11-19).
 - [ ] Optional: redo `emerge` for `quader` and `taposh` (they don't rise from below).
-- [ ] Hero sheets (sprite-animation.md Part B) not generated yet.
+- [x] Hero masters + sheets generated in Flow (2026-11-19) → `art-src/heroes/<id>/`.
+- [x] Heroes in game (2026-11-19): magenta keying in build-frames, 20 hero strips + new stills, played in `drawKick` and the Rope 'Em! hero.
 
 ## Content placeholders (user to decide)
 - [ ] Art and sound files for all characters (prompts in `docs/prompts/`; drop into `assets/`, run `node tools/build-assets.mjs`).

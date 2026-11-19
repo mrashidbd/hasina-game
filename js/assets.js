@@ -23,10 +23,13 @@ export const hasAnim = (def, anim) => hasAsset(def?.anims?.[anim]);
  * (how-to roster, hero cards) can re-render once the art is ready.
  * Walk strips are preloaded too (every character is on screen immediately);
  * the other anims load lazily via getFrame to keep the first load light.
+ * Hero kick/run strips are small and needed at once, so they preload as well.
  */
 export function preloadImages(onLoad) {
   for (const def of [...Object.values(CHARACTERS), ...Object.values(HEROES)]) {
-    for (const path of [...Object.values(def.sprites || {}), def.anims?.walk]) {
+    // heroes' kick/run strips are needed at once; enemies don't have them (undefined skips)
+    const eagerAnims = [def.anims?.kick, def.anims?.run];
+    for (const path of [...Object.values(def.sprites || {}), def.anims?.walk, ...eagerAnims]) {
       if (!path || !known.has(path) || cache.has(path)) continue;
       const img = new Image();
       if (onLoad) img.onload = onLoad;

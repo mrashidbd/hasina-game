@@ -3,14 +3,14 @@
 // and runs for Dhaka. The hero circles the jail at Dhaka, throws a rope at
 // taps (running over first when the target is out of reach) and flings caught
 // crooks into the jail. Locking up Hasina wins the game. Tunables: CONFIG.lasso.
-import { Game, rand, clamp, weighted, EMOJI_FONT } from './game.js';
+import { Game, rand, clamp, weighted, EMOJI_FONT, easeOutBack, easeOutCubic } from './game.js';
 import { BD, INDIA, DHAKA, pointInPoly, distToPoly } from './map.js';
 import { CHARACTERS, MAIN_ID } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
 import { sfx, play } from './audio.js';
 import { t as tr, fmt } from './i18n.js';
 import { CONFIG } from './config.js';
-import { getSprite, getFrame, hasAsset, hasPose } from './assets.js';
+import { getSprite, getFrame, getFrameAt, hasAsset, hasPose } from './assets.js';
 
 const L = CONFIG.lasso;
 
@@ -27,6 +27,18 @@ const FX = {
   hopFade: 0.25, // s, dodge-hop length (same as game.js)
   dustEvery: 0.12, // s, dust puffs behind the running hero
   spinSpeed: 9, // rad/s, spin of a crook flying into the jail
+  // the rope (look only)
+  ropeDark: '#7a5a32', // rope body
+  ropeLight: '#d9b77c', // twisted-strand highlight
+  ropeW: 3.2, // px, rope thickness
+  cinchTime: 0.22, // s, the loop drops from head to waist and pulls tight
+  waistAt: 0.42, // loop height on the body, × sprite height above the feet
+  waistHalfW: 0.14, // tight loop half-width, × sprite height
+  leanShift: 0.07, // the struggling body leans away from the pull: loop shifts with it, × height
+  squeeze: 0.1, // how much the body gets squeezed as the loop bites
+  twangDecay: 5, // 1/s, a tap's rope vibration dies out this fast
+  twangPx: 6, // px, vibration amplitude right after a tap
+  throwAnimTime: 0.35, // s, the throw strip plays once over this, then holds the pointing frame
 };
 
 /** Rounded-rect path (ctx.roundRect is not universal). */
@@ -369,7 +381,7 @@ export class LassoGame extends Game {
     best.pose = 'kicked';
     best.near = Infinity;
     best.hitFlash = CONFIG.combat.hitFlashTime;
-    Object.assign(r, { phase: 'reel', target: best, cx: best.x, cy: best.y, auto: best.hp <= 1, tug: L.reelStart, autoT: 0 });
+    Object.assign(r, { phase: 'reel', target: best, cx: best.x, cy: best.y, auto: best.hp <= 1, tug: L.reelStart, autoT: 0, cinch: 0, twang: 0.6 });
     sfx.hit();
     this.burst(best.x, best.y, '#c9a26b', 10);
     this.quip(best); // "Not again!" as the loop lands (CONFIG.fun)
@@ -378,6 +390,7 @@ export class LassoGame extends Game {
   updateRope(dt) {
     const r = this.rope;
     if (!r) return;
+    r.age = (r.age || 0) + dt; // s since the throw (drawing only: paces the throw strip)
     const step = L.ropeSpeed * dt;
     if (r.phase === 'out') {
       // a homing loop follows the tapped crook (its last spot once it is gone)
@@ -400,6 +413,8 @@ export class LassoGame extends Game {
     // reel
     const e = r.target;
     if (!this.enemies.includes(e)) { r.phase = 'back'; return; }
+    r.cinch += dt; // loop tightening around the crook (drawing only)
+    r.twang = Math.max(0, r.twang - FX.twangDecay * dt);
     let prog;
     if (r.auto) {
       r.autoT += dt;
@@ -542,6 +557,7 @@ export class LassoGame extends Game {
     if (r?.phase === 'reel') { // reeling a tough crook: every tap pulls
       if (!r.auto) {
         r.tug += L.reelPerTap / this.strength(r.target);
+        r.twang = 1; // each yank makes the taut rope vibrate
         this.ripple(px, py);
         sfx.hit();
       }
@@ -718,6 +734,18 @@ export class LassoGame extends Game {
     ctx.fillText(`${boss.def.emoji} ${tr(`char.${boss.type}`)} · ${tr(roped ? 'lReeling' : 'lOnTheLoose')}${roped ? '' : ` · ${left}s`}`, this.w / 2, y + bh / 2 + 1);
   }
 
+  /**
+   * Current hero animation frame, or null (the heroSprite still takes over).
+   * Reeling plays the hand-over-hand pull loop; the rope out/back plays one
+   * quick throw that settles on the pointing frame; otherwise cheer or run.
+   */
+  heroFrame(def) {
+    if (!this.rope) return this.cheerT > 0 ? getFrame(def, 'cheer', this.time) : getFrame(def, 'run', this.time);
+    return this.rope.phase === 'reel'
+      ? getFrame(def, 'pull', this.time)
+      : getFrameAt(def, 'throw', clamp((this.rope.age || 0) / FX.throwAnimTime, 0, 1));
+  }
+
   heroSprite(def) {
     const want = this.rope?.phase === 'reel' ? ['pull', 'kick'] : this.rope ? ['throw', 'kick'] : this.cheerT > 0 ? ['cheer'] : ['run'];
     for (const p of want) if (hasAsset(def.sprites?.[p])) return getSprite(def, p);
@@ -790,6 +818,91 @@ export class LassoGame extends Game {
     ctx.fillStyle = '#ffe15a';
     ctx.fillText(label, 0, -h / 2 - 11);
     ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- rope drawing
+  /**
+   * Where the loop sits on a roped crook (screen px). It lands wide at head
+   * height, then drops to the waist and cinches tight (with a little overshoot),
+   * so it reads as a lasso pulled shut rather than a ring painted on top.
+   */
+  loopGeom(e, r) {
+    const S = CONFIG.sprites;
+    const rp = this.rpx(e.r), h = rp * S.heightMul;
+    const x = this.sx(e.x), feetY = this.sy(e.y) + rp * S.feetOffset;
+    const k = clamp((r.cinch ?? 1) / FX.cinchTime, 0, 1);
+    const wide = Math.max(h * 0.4, L.loopRadius * this.mods.tapRadius * this.s * 0.7);
+    const rx = wide + (h * FX.waistHalfW - wide) * easeOutBack(k);
+    const y = feetY - h * (FX.waistAt + 0.4 * (1 - easeOutCubic(k)));
+    const ry = rx * 0.3;
+    const side = this.hx < e.x ? -1 : 1; // the knot faces the hero
+    const cx = x - side * h * FX.leanShift * easeOutCubic(k); // waist is off the head line
+    return { x: cx, y, rx, ry, k, top: feetY - h, kx: cx + side * rx * 0.92, ky: y + ry * 0.35, side };
+  }
+
+  /** Two-tone stroke along a path: dark rope body + a dashed twisted-strand highlight. */
+  ropeStroke(path, t, w = FX.ropeW) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = FX.ropeDark;
+    ctx.lineWidth = w;
+    ctx.beginPath(); path(); ctx.stroke();
+    ctx.strokeStyle = FX.ropeLight;
+    ctx.lineWidth = w * 0.45;
+    ctx.setLineDash([w * 1.4, w * 1.1]);
+    ctx.lineDashOffset = -t * 30; // strands seem to run as the rope is hauled in
+    ctx.beginPath(); path(); ctx.stroke();
+    ctx.restore();
+  }
+
+  /** The rope from the hero's hand: sagging when slack, vibrating after a yank. */
+  drawRopeLine(x0, y0, x1, y1, sag, twang, t) {
+    const { ctx } = this;
+    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len; // unit normal
+    const amp = twang * FX.twangPx;
+    this.ropeStroke(() => {
+      const n = 18;
+      for (let i = 0; i <= n; i++) {
+        const s = i / n;
+        const bow = sag * 4 * s * (1 - s); // gravity sag (screen-down)
+        const wob = amp * Math.sin(s * Math.PI) * Math.sin(s * Math.PI * 3 - t * 45);
+        const px = x0 + dx * s + nx * wob, py = y0 + dy * s + bow + ny * wob;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    }, t);
+  }
+
+  /** Back half (behind the body) or front half + knot of the loop around a roped crook. */
+  drawLoop(g, front, t) {
+    const { ctx } = this;
+    // back = upper half of the ellipse (angles π..2π), front = lower half
+    this.ropeStroke(() => ctx.ellipse(g.x, g.y, g.rx, g.ry, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2), t, FX.ropeW * (front ? 1 : 0.85));
+    if (!front) return;
+    // knot + a short loose tail where the rope runs off to the hero
+    ctx.fillStyle = FX.ropeDark;
+    ctx.beginPath(); ctx.arc(g.kx, g.ky, FX.ropeW * 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = FX.ropeLight;
+    ctx.beginPath(); ctx.arc(g.kx - g.side, g.ky - 1, FX.ropeW * 0.5, 0, Math.PI * 2); ctx.fill();
+    this.ropeStroke(() => { ctx.moveTo(g.kx, g.ky); ctx.quadraticCurveTo(g.kx + g.side * 2, g.ky + 6, g.kx - g.side * 3, g.ky + 11); }, t, FX.ropeW * 0.8);
+  }
+
+  /** A roped crook: loop behind, body squeezed as the loop bites, loop in front. */
+  drawEnemy(e, t) {
+    const r = this.rope;
+    if (r?.phase !== 'reel' || r.target !== e) { super.drawEnemy(e, t); return; }
+    const { ctx } = this;
+    const g = this.loopGeom(e, r);
+    this.drawLoop(g, false, t);
+    const bite = Math.sin(g.k * Math.PI) * FX.squeeze; // squeeze peaks mid-cinch
+    ctx.save();
+    ctx.translate(g.x, g.y);
+    ctx.scale(1 - bite, 1 + bite * 0.5);
+    ctx.translate(-g.x, -g.y);
+    super.drawEnemy(e, t);
+    ctx.restore();
+    this.drawLoop(g, true, t);
   }
 
   /** Caught crooks spinning along a parabola into the jail. */
@@ -875,27 +988,29 @@ export class LassoGame extends Game {
     const bob = running ? Math.abs(Math.sin(t * 12)) * 3 : 0;
     const handX = hx + this.heroFacing * size * 0.22, handY = hy - size * 0.18 - bob;
 
-    // 5. rope + loop + tug meter
+    // 5. rope + loop + tug meter (while reeling, the loop itself is drawn around
+    //    the crook in drawEnemy so its back half can go behind the body)
     const r = this.rope;
     if (r) {
-      const ex = this.sx(r.x), ey = this.sy(r.y);
+      let ex = this.sx(r.x), ey = this.sy(r.y);
+      let tension = 0;
+      if (r.phase === 'reel') {
+        const g = this.loopGeom(r.target, r);
+        ex = g.kx; ey = g.ky; // the rope ends at the knot on the hero's side
+        tension = r.auto ? 1 : clamp(r.tug, 0, 1);
+      }
       const len = Math.hypot(ex - handX, ey - handY);
-      const sag = r.phase === 'reel' ? 4 : 10 + len * 0.08;
-      ctx.strokeStyle = '#c9a26b';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(handX, handY);
-      ctx.quadraticCurveTo((handX + ex) / 2, (handY + ey) / 2 + sag, ex, ey);
-      ctx.stroke();
-      const loopR = r.phase === 'reel' ? this.rpx(r.target.r) * 1.1 : L.loopRadius * this.mods.tapRadius * this.s;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(ex, ey, loopR, loopR * 0.6, r.phase === 'out' ? (t * 8) % (Math.PI * 2) : 0, 0, Math.PI * 2);
-      ctx.stroke();
+      // slack while flying, nearly straight once it's pulled tight
+      const sag = r.phase === 'reel' ? 3 + 9 * (1 - tension) : 10 + len * 0.08;
+      this.drawRopeLine(handX, handY, ex, ey, sag, r.phase === 'reel' ? r.twang : 0, t);
+      if (r.phase !== 'reel') { // the open loop spinning through the air
+        const loopR = L.loopRadius * this.mods.tapRadius * this.s;
+        this.ropeStroke(() => ctx.ellipse(ex, ey, loopR, loopR * 0.6, r.phase === 'out' ? (t * 8) % (Math.PI * 2) : 0, 0, Math.PI * 2), t);
+      }
 
       if (r.phase === 'reel' && !r.auto) {
-        const bw = 54, bh = 7, bx = ex - bw / 2, by = ey - this.rpx(r.target.r) * CONFIG.sprites.heightMul * 0.6 - 26;
+        const g = this.loopGeom(r.target, r);
+        const bw = 54, bh = 7, bx = g.x - bw / 2, by = g.top - 22;
         const v = clamp(r.tug, 0, 1);
         ctx.fillStyle = 'rgba(0,0,0,0.65)';
         ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
@@ -903,7 +1018,7 @@ export class LassoGame extends Game {
         ctx.fillRect(bx, by, bw * v, bh);
         const pulse = 1 + 0.15 * Math.sin(t * 18);
         ctx.save();
-        ctx.translate(ex, by - 14);
+        ctx.translate(g.x, by - 14);
         ctx.scale(pulse, pulse);
         this.hintText(tr('lTapFast'), 0, 0);
         ctx.restore();
@@ -926,13 +1041,17 @@ export class LassoGame extends Game {
       }
     }
 
-    // 7. the hero (sprite poses when present, emoji disc otherwise)
-    const sprite = this.heroSprite(def);
+    // 7. the hero (animation strip when present, else still poses, else emoji disc)
+    const frame = this.heroFrame(def);
+    const sprite = frame ? null : this.heroSprite(def);
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(hx, hy + size * 0.42, size * 0.32, size * 0.11, 0, 0, Math.PI * 2); ctx.fill();
     ctx.save();
     ctx.translate(hx, hy - bob);
-    if (sprite) {
+    if (frame) {
+      if (this.heroFacing < 0) ctx.scale(-1, 1); // sprites face right
+      ctx.drawImage(frame.img, frame.sx, 0, frame.side, frame.side, -size / 2, -size / 2, size, size);
+    } else if (sprite) {
       if (this.heroFacing < 0) ctx.scale(-1, 1); // sprites face right
       // One image per hero: fake the rope poses by leaning the ready pose.
       if (r?.phase === 'reel' && !hasPose(def, 'pull')) ctx.rotate(-12 * Math.PI / 180); // leaning back

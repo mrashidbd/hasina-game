@@ -37,6 +37,9 @@ an extension point).
   the static sprite and its fakes (waddle, lean/squash, bob); otherwise the old path is used.
   Mapping: walking → walk; Rope 'Em! roped (`pose 'kicked'`) and yanked → struggle; jail → jailed;
   classic flee → kicked; climbing out of a hole → emerge (by climb progress).
+  **Heroes** (2026-11-19): `kick` (classic kick, by kick progress), `run` (orbit/chase), `throw`
+  (by rope age), `pull` (reeling), `cheer`; sources are magenta-keyed sheets in `art-src/heroes/<id>/`,
+  and the tool also writes new `ready/kick/run/throw/pull/cheer.png` stills.
   Built by `tools/build-frames.mjs` from `art-src/enemies/<id>/` (Flow clips `<anim>.mp4` and
   sheets `<anim>-sheet.jpg`): `URL=about:blank node tools/cdp.mjs tools/build-frames.mjs`
   (ffmpeg pulls clip frames; headless Chromium keys green, trims, aligns feet/head, writes 256 px
@@ -279,6 +282,12 @@ Tunables: `CONFIG.lasso`; rules in `docs/PLAN-lasso.md`. `wave` mirrors `level`.
 - **Drawing** (`drawLayer`): `drawJail()` (stone box at DHAKA, the last 8 prisoners' faces,
   bars, 🔒 count, shake), the orbit circle, red sneak lines, `drawYanks()` (spinning arc
   into the jail), rope / loop / tug meter, the chase line, the hero, and the range ring.
+- **Rope look (2026-11-19):** while reeling, `LassoGame.drawEnemy` wraps the roped crook: back
+  half of the loop → body (squeezed as the loop bites) → front half + knot. `loopGeom(e, r)` drops
+  the loop from head height to the waist and cinches it (`r.cinch`, ease-out-back) and shifts it
+  with the struggling lean. `drawRopeLine` sags when slack, goes taut with the tug meter and
+  vibrates after each tap (`r.twang`); `ropeStroke` draws a two-tone twisted rope with moving
+  strands. Look-only values live in `FX` in lasso.js.
 - **Summary**: `{ mode: 'lasso', won, level, locked, lives, reason, time, wave: level }`.
   main.js shows `#overTitle` as `lWinTitle` (class `good`) or `lLostTitle` (`bad`), and
   resets it to `breached` for classic.
@@ -343,6 +352,14 @@ generated how-to tables and game-over stats.
 ## PWA
 - `sw.js`: precaches `ASSETS` on install under cache name `VERSION`, deletes other
   caches on activate, serves same-origin GETs stale-while-revalidate.
+- **Instant updates (2026-11-19):** install fetches with `cache: 'reload'` and the background
+  refresh with `cache: 'no-cache'` (GitHub Pages lets browsers keep files ~10 min, which could
+  otherwise put old files into a new version's cache). `skipWaiting` + `clients.claim`; when the
+  new version replaced an older one, `activate` reloads open windows (`client.navigate`; this also
+  reaches pages still running old code). `main.js` registers with `updateViaCache: 'none'`, calls
+  `reg.update()` on every load, and reloads once on `controllerchange` (not on a first install).
+  Tested headless (chromium headless shell): v16 → v17 deploy, one visit → the page reloads
+  itself ~1 s later on the new build. Still bump `VERSION` for every shipped change.
 - Manifest: fullscreen, any orientation, icons in `icons/`.
 - `main.js` shows an "Install app" button on `beforeinstallprompt`, and an iOS
   "Add to Home Screen" hint on iOS Safari when not standalone.
